@@ -12,12 +12,13 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("⬇️ **스크롤**")
 
 st.markdown("""
-<div style="background-color:purple; padding:10px; border-radius:8px; color:white;">
-이탈 여부(및 위험율)를 한 눈에 보이게 출력한다.  
-아래는 가장 큰 요인이 된 칼럼의 이름과 그에 맞는 대안을 텍스트로 출력한다.  
-(점선 박스는 매번 변경되는 텍스트)
+<div style="font-size:40px; font-weight:bold; color:#4B8BBE; 
+            background-color:#f0f0f0; padding:10px 20px; border-radius:10px;
+            display:inline-block; box-shadow:2px 2px 5px rgba(0,0,0,0.1);">
+    📊 고객 분석 대시보드
 </div>
 """, unsafe_allow_html=True)
+
 
 st.subheader("선택한 고객 ID: **a500**")
 
