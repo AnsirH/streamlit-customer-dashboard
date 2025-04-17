@@ -85,127 +85,204 @@ class ChurnPredictor:
         """기본 예측값 반환"""
         return np.array([0]), np.array([0.5])
     
-    def _preprocess_data(self, input_df):
+    def _preprocess_data(self, data):
         """
-        입력 데이터를 전처리합니다.
+        모델 예측을 위해 입력 데이터를 전처리합니다.
         
         Args:
-            input_df (pandas.DataFrame): 원본 입력 데이터
+            data (pd.DataFrame): 전처리할 입력 데이터
             
         Returns:
-            pandas.DataFrame: 전처리된 데이터
+            pd.DataFrame: 모델 입력에 맞게 전처리된 데이터
         """
-        # 입력 데이터 복사
-        df = input_df.copy()
-        
-        # CustomerID 제거 (예측에 사용되지 않음)
-        columns_to_remove = ['CustomerID', 'customer_id', 'cust_id', 'id']
-        for col in columns_to_remove:
-            if col in df.columns:
-                df = df.drop(col, axis=1)
-        
-        # Complain 불리언 변환 (예/아니오 -> 0/1)
-        if 'Complain' in df.columns and isinstance(df['Complain'].iloc[0], str):
-            df['Complain'] = df['Complain'].apply(lambda x: 1 if x == '예' else 0)
-        
-        # 모델이 없으면 전처리 불가능
-        if self.model is None or not hasattr(self.model, 'feature_names_in_'):
-            st.error("🔍 디버그: 모델이 로드되지 않았거나 feature_names_in_ 속성이 없어 원핫인코딩을 수행할 수 없습니다.")
-            return df
-        
-        # 모델의 특성 이름 가져오기
-        model_features = self.model.feature_names_in_
-        
-        # 원핫인코딩 해야할 범주형 변수 목록
-        categorical_columns = [
-            'Gender', 
-            'MaritalStatus', 
-            'PreferredLoginDevice', 
-            'PreferredPaymentMode', 
-            'PreferedOrderCat'
-        ]
-        
-        # 모델에서 사용하는 모든 범주형 값을 추출
-        encoded_features = self.get_onehot_encoded_features()
-        st.write(f"🔍 디버그: 모델에서 사용하는 원핫인코딩 특성: {encoded_features}")
-        
-        # 새로운 데이터프레임 (원핫인코딩 결과를 담을 것임)
-        result_df = pd.DataFrame(index=df.index)
-        
-        # 범주형이 아닌 변수들 먼저 복사
-        for col in df.columns:
-            if col not in categorical_columns:
-                result_df[col] = df[col]
-        
-        # 범주형 변수 원핫인코딩 수행
-        for col in categorical_columns:
-            if col in df.columns and col in encoded_features:
-                value = df[col].iloc[0]  # 단일 행 데이터 가정
-                
-                # 현재 변수의 모든 원핫인코딩 컬럼 초기화 (0으로)
-                for encoded_col in encoded_features[col]:
-                    result_df[encoded_col] = 0
-                
-                # 현재 값에 해당하는 원핫인코딩 컬럼을 1로 설정
-                expected_col = f"{col}_{value}"
-                if expected_col in encoded_features[col]:
-                    result_df[expected_col] = 1
-                else:
-                    st.warning(f"🔍 디버그: '{col}'의 값 '{value}'에 해당하는 원핫인코딩 컬럼이 모델에 없습니다. 가능한 값: {[c.replace(f'{col}_', '') for c in encoded_features[col]]}")
-        
-        # 누락된 특성 확인 (모델에서 필요로 하는 특성이 전처리 후 데이터에 없는 경우)
-        missing_features = set(model_features) - set(result_df.columns)
-        if missing_features:
-            st.warning(f"🔍 디버그: 전처리 후 누락된 특성 {len(missing_features)}개: {list(missing_features)[:5]}...")
+        try:
+            # 원본 데이터 로깅
+            st.write(f"🔍 디버그 [전처리]: 원본 데이터 크기: {data.shape}")
+            st.write(f"🔍 디버그 [전처리]: 원본 컬럼: {list(data.columns)}")
             
-            # 누락된 특성을 0으로 채움
-            for feature in missing_features:
-                result_df[feature] = 0
-        
-        # 불필요한 특성 제거 (모델에서 사용하지 않는 특성)
-        extra_features = set(result_df.columns) - set(model_features)
-        if extra_features:
-            st.warning(f"🔍 디버그: 모델에서 사용하지 않는 특성 {len(extra_features)}개: {list(extra_features)[:5]}...")
-            result_df = result_df.drop(columns=list(extra_features))
-        
-        # 모델에서 사용하는 순서대로 특성 정렬
-        result_df = result_df[model_features]
-        
-        # 디버그 출력 추가
-        st.write(f"🔍 디버그: 데이터 전처리 완료 - 컬럼 수: {len(result_df.columns)}")
-        st.write(f"🔍 디버그: 원핫인코딩 후 컬럼 샘플: {list(result_df.columns)[:5]}...")
-        
-        return result_df
+            # 모델 확인
+            if self.model is None:
+                st.error("⚠️ 모델이 로드되지 않았습니다. 전처리를 수행할 수 없습니다.")
+                return data
+                
+            if not hasattr(self.model, 'feature_names_in_'):
+                st.error("⚠️ 모델에 'feature_names_in_' 속성이 없습니다. 올바른 형식의 모델인지 확인하세요.")
+                return data
+            
+            # 모델 특성 확인
+            model_features = list(self.model.feature_names_in_)
+            st.write(f"🔍 디버그 [전처리]: 모델 특성 수: {len(model_features)}")
+            st.write(f"🔍 디버그 [전처리]: 모델 특성 샘플: {model_features[:5]}")
+            
+            # 범주형 특성 식별
+            if hasattr(self, 'categorical_columns') and self.categorical_columns:
+                categorical_cols = [col for col in self.categorical_columns if col in data.columns]
+            else:
+                # 데이터 유형에 기반하여 범주형 특성 자동 감지
+                categorical_cols = data.select_dtypes(include=['object', 'category']).columns.tolist()
+                # 숫자형이지만 고유값이 적은 경우도 범주형으로 간주
+                for col in data.select_dtypes(include=['int64', 'float64']).columns:
+                    if col in data.columns and data[col].nunique() < 10:
+                        categorical_cols.append(col)
+            
+            st.write(f"🔍 디버그 [전처리]: 범주형 특성: {categorical_cols}")
+            
+            # 원핫인코딩 적용 전 데이터 체크
+            st.write(f"🔍 디버그 [전처리]: 원핫인코딩 전 데이터 크기: {data.shape}")
+            
+            # 원핫인코딩된 특성 사전 가져오기 
+            encoded_features_dict = self.get_onehot_encoded_features()
+            st.write(f"🔍 디버그 [전처리]: 원핫인코딩 그룹 수: {len(encoded_features_dict)}")
+            
+            # 모든 원핫인코딩 특성 목록
+            all_encoded_features = []
+            for feature_list in encoded_features_dict.values():
+                all_encoded_features.extend(feature_list)
+            
+            st.write(f"🔍 디버그 [전처리]: 총 원핫인코딩 특성 수: {len(all_encoded_features)}")
+            
+            # 원핫인코딩 적용
+            if categorical_cols:
+                X_encoded = pd.get_dummies(data, columns=categorical_cols, drop_first=False)
+                st.write(f"🔍 디버그 [전처리]: 원핫인코딩 후 데이터 크기: {X_encoded.shape}")
+                st.write(f"🔍 디버그 [전처리]: 원핫인코딩 후 컬럼: {list(X_encoded.columns)[:10]}...")
+            else:
+                X_encoded = data.copy()
+                st.write("🔍 디버그 [전처리]: 범주형 변수가 없어 원핫인코딩을 수행하지 않습니다.")
+            
+            # 누락된 특성 확인 및 처리
+            missing_features = set(model_features) - set(X_encoded.columns)
+            extra_features = set(X_encoded.columns) - set(model_features)
+            
+            st.write(f"🔍 디버그 [전처리]: 누락된 특성 수: {len(missing_features)}")
+            if missing_features:
+                st.write(f"🔍 디버그 [전처리]: 누락된 특성 목록: {list(missing_features)[:5]}...")
+                # 누락된 특성에 0 채우기
+                for feature in missing_features:
+                    X_encoded[feature] = 0
+            
+            st.write(f"🔍 디버그 [전처리]: 추가 특성 수: {len(extra_features)}")
+            if extra_features:
+                st.write(f"🔍 디버그 [전처리]: 추가 특성 목록: {list(extra_features)[:5]}...")
+                # 예상하지 않은 특성 제거
+                X_encoded = X_encoded.drop(columns=extra_features)
+            
+            # 원핫인코딩 디버깅: 원본 특성과 인코딩된 특성 간의 매핑 확인
+            if categorical_cols:
+                st.write("🔍 디버그 [전처리]: 범주형 특성별 원핫인코딩 결과:")
+                for cat_col in categorical_cols:
+                    # 원본 데이터의 고유값
+                    unique_values = data[cat_col].unique()
+                    # 해당 특성으로 시작하는 원핫인코딩 컬럼
+                    ohe_cols = [col for col in X_encoded.columns if col.startswith(f"{cat_col}_")]
+                    st.write(f"  - {cat_col}: 원본값 {list(unique_values)} → 인코딩 컬럼 {ohe_cols}")
+            
+            # 모델 특성 순서에 맞게 재정렬
+            processed_data = X_encoded[model_features]
+            
+            st.write(f"🔍 디버그 [전처리]: 최종 처리된 데이터 크기: {processed_data.shape}")
+            
+            return processed_data
+            
+        except Exception as e:
+            st.error(f"⚠️ 데이터 전처리 중 오류 발생: {str(e)}")
+            import traceback
+            st.write(f"🔍 디버그 [전처리]: 상세 오류: {traceback.format_exc()}")
+            # 원본 데이터 반환
+            return data
     
     def get_onehot_encoded_features(self):
         """
-        모델의 원핫인코딩된 특성들을 추출합니다.
+        모델에서 사용하는 원핫인코딩된 특성 목록을 추출합니다.
         
         Returns:
-            dict: {원본 특성명: [원핫인코딩된 컬럼들]} 형태의 사전
+            dict: 범주형 변수별 원핫인코딩된 특성 목록 (예: {'Gender': ['Gender_Male', 'Gender_Female']})
         """
-        # 모델이 없거나 feature_names_in_ 속성이 없는 경우
-        if self.model is None or not hasattr(self.model, 'feature_names_in_'):
+        # 모델 체크
+        if self.model is None:
+            st.warning("⚠️ 모델이 로드되지 않아 원핫인코딩 특성을 분석할 수 없습니다.")
             return {}
             
-        # 모델의 특성 이름 가져오기
-        feature_names = self.model.feature_names_in_
+        if not hasattr(self.model, 'feature_names_in_'):
+            st.warning("⚠️ 모델에 feature_names_in_ 속성이 없습니다.")
+            return {}
         
-        # 원핫인코딩 패턴 찾기 (예: Gender_Male, Gender_Female)
-        encoded_features = {}
+        # 모델의 모든 특성 목록 가져오기
+        all_features = list(self.model.feature_names_in_)
+        total_features = len(all_features)
+        st.write(f"🔍 디버그 [원핫인코딩]: 모델의 총 특성 수: {total_features}")
         
-        # 가능한 접두사 목록 (범주형 변수들)
+        # 원핫인코딩된 특성을 찾기 위한 분석
+        underscore_features = [f for f in all_features if '_' in f]
+        st.write(f"🔍 디버그 [원핫인코딩]: 언더스코어(_)가 포함된 특성 수: {len(underscore_features)}")
+        
+        if len(underscore_features) == 0:
+            st.warning("⚠️ 언더스코어가 포함된 특성이 없습니다. 원핫인코딩 특성이 아닐 수 있습니다.")
+            # 특성 구조 더 자세히 분석
+            has_digits = sum(1 for f in all_features if any(c.isdigit() for c in f))
+            has_uppercase = sum(1 for f in all_features if any(c.isupper() for c in f))
+            st.write(f"🔍 디버그 [원핫인코딩]: 숫자가 포함된 특성 수: {has_digits}")
+            st.write(f"🔍 디버그 [원핫인코딩]: 대문자가 포함된 특성 수: {has_uppercase}")
+            st.write(f"🔍 디버그 [원핫인코딩]: 특성 샘플: {all_features[:10]}")
+            # 특성 값 분포 확인
+            if hasattr(self.model, 'feature_importances_'):
+                top_indices = np.argsort(self.model.feature_importances_)[-5:]
+                top_features = [all_features[i] for i in top_indices]
+                top_importances = [self.model.feature_importances_[i] for i in top_indices]
+                st.write("🔍 디버그 [원핫인코딩]: 상위 5개 중요 특성:")
+                for f, imp in zip(top_features, top_importances):
+                    st.write(f"  - {f}: {imp:.4f}")
+            return {}
+        
+        # 가능한 범주형 변수 접두사
         possible_prefixes = [
-            'Gender', 'MaritalStatus', 'PreferredLoginDevice', 
-            'PreferredPaymentMode', 'PreferedOrderCat'
+            'Gender', 'Marital', 'City', 'Complain', 'CityTier', 
+            'PreferredLogin', 'Login', 'PreferredPayment', 'Payment', 
+            'PreferedOrder', 'OrderCat', 'Status', 'Occupation'
         ]
         
-        # 각 접두사에 대해 관련 특성 검색
+        # 각 접두사별로 특성 탐색
+        encoded_features = {}
+        found_any = False
+        
         for prefix in possible_prefixes:
-            prefix_cols = [f for f in feature_names if f.startswith(f"{prefix}_")]
-            if prefix_cols:
-                encoded_features[prefix] = prefix_cols
-                
+            # 접두사로 시작하는 특성 찾기
+            prefix_features = [f for f in all_features if f.startswith(f"{prefix}_")]
+            if prefix_features:
+                found_any = True
+                encoded_features[prefix] = prefix_features
+                st.write(f"🔍 디버그 [원핫인코딩]: '{prefix}'에 대한 원핫인코딩 특성 발견: {len(prefix_features)}개")
+                st.write(f"🔍 디버그 [원핫인코딩]: '{prefix}' 범주값: {[f.split('_', 1)[1] for f in prefix_features]}")
+        
+        # 접두사 다시 확인 (대소문자 무시)
+        if not found_any:
+            st.warning("⚠️ 일반적인 접두사로 원핫인코딩 특성이 발견되지 않았습니다. 추가 분석 중...")
+            
+            # 언더스코어로 구분된 모든 접두사 분석
+            all_prefixes = {}
+            for feature in underscore_features:
+                prefix = feature.split('_')[0]
+                if prefix not in all_prefixes:
+                    all_prefixes[prefix] = []
+                all_prefixes[prefix].append(feature)
+            
+            # 접두사별 특성 수 분석
+            st.write(f"🔍 디버그 [원핫인코딩]: 발견된 모든 접두사: {list(all_prefixes.keys())}")
+            for prefix, features in all_prefixes.items():
+                if len(features) >= 2:  # 최소 2개 이상의 특성이 있으면 원핫인코딩 가능성 있음
+                    encoded_features[prefix] = features
+                    st.write(f"🔍 디버그 [원핫인코딩]: 잠재적인 원핫인코딩 접두사 '{prefix}': {len(features)}개 특성")
+                    
+            # 언더스코어로 시작하는 특성 분석
+            starts_with_underscore = [f for f in all_features if f.startswith('_')]
+            if starts_with_underscore:
+                st.write(f"🔍 디버그 [원핫인코딩]: 언더스코어로 시작하는 특성: {len(starts_with_underscore)}개")
+        
+        if not encoded_features:
+            st.warning("⚠️ 어떤 방식으로도 원핫인코딩 특성을 찾을 수 없습니다.")
+            # 전체 특성 목록의 처음 10개 출력
+            st.write(f"🔍 디버그 [원핫인코딩]: 특성 목록 샘플: {all_features[:10]}")
+        
         return encoded_features
     
     def _compute_feature_importance(self, input_data):
