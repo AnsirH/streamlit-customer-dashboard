@@ -3,7 +3,7 @@ import pandas as pd
 from components.header import show_header
 from components.animations import add_page_transition
 from utils.visualizer import Visualizer
-from utils.data_generator import generate_sample_data
+from models.customer_analysis import analyze_customers
 
 def show():
     # 애니메이션 적용
@@ -122,4 +122,17 @@ def show():
         Visualizer.create_correlation_bar(),  # 예시 데이터 사용
         use_container_width=True
     ) 
-
+    
+    # 데이터 분석 실행
+    try:
+        # 분석 결과 가져오기
+        result_df = analyze_customers()
+        
+        # Visualizer 인스턴스 생성
+        viz = Visualizer()
+        
+        # 테이블 표시
+        viz.display_prediction_table(result_df)
+        
+    except Exception as e:
+        st.error(f"데이터 분석 중 오류가 발생했습니다: {str(e)}")
