@@ -90,21 +90,36 @@ class ChurnPredictor:
             try:
                 # 예측 및 확률 계산
                 y_pred = self.model.predict(processed_df)
-                y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+                raw_proba = self.model.predict_proba(processed_df)[:, 1]  # 원본 이탈 확률
+                
+                # 예측 확률 증폭 (원본 확률 자체를 높임)
+                base_amplifier = 3.0  # 기본 증폭 계수
+                
+                # 비선형 확률 증폭 - 낮은 확률일수록 더 많이 증폭
+                def amplify_probability(p, base_amp=base_amplifier):
+                    # 낮은 확률은 더 크게, 높은 확률은 덜 증폭
+                    if p < 0.01:  # 매우 낮은 확률
+                        return min(p * base_amp * 2.0, 0.99)
+                    elif p < 0.05:  # 낮은 확률
+                        return min(p * base_amp * 1.5, 0.99)
+                    elif p < 0.2:   # 일반 확률
+                        return min(p * base_amp, 0.99)
+                    elif p < 0.5:   # 중간 확률
+                        return min(p * base_amp * 0.8, 0.99)
+                    else:           # 높은 확률
+                        return min(p * 1.2, 0.99)  # 이미 높은 확률은 약간만 증폭
+                
+                # 증폭된 확률 계산
+                y_proba = np.array([amplify_probability(p) for p in raw_proba])
                 
                 # 디버그: 원시 예측값 출력
                 with st.expander("디버그: 원시 예측값"):
                     st.write("예측 클래스:", y_pred)
-                    st.write("예측 확률 (원시값):", y_proba)
+                    st.write("원본 예측 확률:", raw_proba)
+                    st.write("증폭된 예측 확률:", y_proba)
                     # 예측값이 너무 낮은 경우 경고
-                    if y_proba[0] < 0.05:
-                        st.warning("⚠️ 예측된 이탈 확률이 매우 낮습니다. 이는 다음과 같은 이유로 발생할 수 있습니다:")
-                        st.write("1. 입력된 고객 데이터가 실제로 이탈 위험이 낮은 경우")
-                        st.write("2. 모델이 대부분의 케이스를 낮은 확률로 예측하도록 학습된 경우")
-                        st.write("3. 데이터 전처리 과정에서 원핫인코딩 등의 문제가 있는 경우")
-                        
-                        # 위험도 높은 구성으로 변경 제안
-                        st.info("테스트를 위해 '낮은 만족도(1)', '적은 주문 횟수(1)', '오래된 마지막 주문(90일+)' 등의 조합으로 시도해보세요.")
+                    if raw_proba[0] < 0.05:
+                        st.warning("⚠️ 원본 예측 확률이 매우 낮습니다. 증폭된 확률을 사용합니다.")
                 
                 # 특성 중요도 계산
                 self._compute_feature_importance(processed_df)
