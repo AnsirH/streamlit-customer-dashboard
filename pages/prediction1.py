@@ -3,12 +3,12 @@
 import sys
 from pathlib import Path
 
-# ── 모듈 경로 설정: 프로젝트 루트(이 파일의 두 단계 위)에 churn_model.py가 있습니다.
+# 프로젝트 루트를 PYTHONPATH에 추가
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from churn_model import ChurnPredictor
+from models.churn_model import ChurnPredictor
 
 import streamlit as st
 import pandas as pd
@@ -44,13 +44,13 @@ if st.button("이탈 예측하기"):
     # 예측 수행
     predictor = ChurnPredictor()
     pred, proba = predictor.predict(input_df)
-    prob = float(proba[0]) * 100
+    prob_pct = float(proba[0]) * 100
 
-    # 2) 게이지바
+    # 2) 이탈율 위험도 게이지바
     st.header("2) 이탈율 위험도 게이지바")
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge+number",
-        value=prob,
+        value=prob_pct,
         number={'suffix': '%'},
         gauge={
             'axis': {'range': [0, 100]},
@@ -67,11 +67,9 @@ if st.button("이탈 예측하기"):
     # 3) 주요 영향 요인
     st.header("3) 주요 영향 요인")
     fi = predictor.get_feature_importance()
-    # get_feature_importance() 반환 dict 또는 ndarray 대응
     if isinstance(fi, dict):
         items = fi.items()
     else:
-        # ndarray: 순서대로 feature 순서대로 매핑
         items = zip(input_df.columns, fi)
 
     fi_df = pd.DataFrame(items, columns=['feature', 'importance']) \
