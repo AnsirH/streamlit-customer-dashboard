@@ -6,32 +6,49 @@ def generate_sample_data(n_samples=1000):
     """임시 데이터 생성"""
     np.random.seed(42)
     
-    data = {
+    # 숫자형 데이터 생성
+    numeric_data = {
         'CustomerID': [f'C{i:04d}' for i in range(1, n_samples+1)],
         'Churn': np.random.choice([0, 1], n_samples, p=[0.7, 0.3]).astype(int),
         'Tenure': np.random.randint(1, 60, n_samples).astype(int),
-        'PreferredLoginDevice': np.random.choice(['Mobile', 'Desktop', 'Tablet'], n_samples),
         'CityTier': np.random.randint(1, 4, n_samples).astype(int),
         'WarehouseToHome': np.random.randint(5, 50, n_samples).astype(int),
-        'PreferredPaymentMode': np.random.choice(['Credit Card', 'Debit Card', 'UPI', 'Cash on Delivery'], n_samples),
-        'Gender': np.random.choice(['Male', 'Female'], n_samples),
         'HourSpendOnApp': np.random.uniform(0, 10, n_samples).round(1).astype(float),
         'NumberOfDeviceRegistered': np.random.randint(1, 5, n_samples).astype(int),
-        'PreferedOrderCat': np.random.choice(['Electronics', 'Fashion', 'Grocery', 'Home'], n_samples),
         'SatisfactionScore': np.random.randint(1, 6, n_samples).astype(int),
-        'MaritalStatus': np.random.choice(['Single', 'Married', 'Divorced'], n_samples),
         'NumberOfAddress': np.random.randint(1, 4, n_samples).astype(int),
         'Complain': np.random.choice([0, 1], n_samples, p=[0.9, 0.1]).astype(int),
         'OrderAmountHikeFromlastYear': np.random.uniform(0, 30, n_samples).round(1).astype(float),
         'CouponUsed': np.random.choice([0, 1], n_samples, p=[0.4, 0.6]).astype(int),
         'OrderCount': np.random.randint(1, 100, n_samples).astype(int),
         'DaySinceLastOrder': np.random.randint(1, 90, n_samples).astype(int),
-        'CashbackAmount': np.random.uniform(0, 100, n_samples).round(2).astype(float)
+        'CashbackAmount': np.random.uniform(0, 100, n_samples).round(2).astype(float),
+        'churn_probability': np.random.uniform(0, 1, n_samples).astype(float)
     }
     
-    df = pd.DataFrame(data)
+    # 범주형 데이터 생성
+    categorical_data = {
+        'PreferredLoginDevice': np.random.choice(['Mobile', 'Desktop', 'Tablet'], n_samples),
+        'PreferredPaymentMode': np.random.choice(['Credit Card', 'Debit Card', 'UPI', 'Cash on Delivery'], n_samples),
+        'Gender': np.random.choice(['Male', 'Female'], n_samples),
+        'PreferedOrderCat': np.random.choice(['Electronics', 'Fashion', 'Grocery', 'Home'], n_samples),
+        'MaritalStatus': np.random.choice(['Single', 'Married', 'Divorced'], n_samples)
+    }
     
-    # 이탈 확률 생성 (실제 모델 대신 임시값)
-    df['churn_probability'] = np.random.uniform(0, 1, n_samples).astype(float)
+    # 데이터프레임 생성
+    df = pd.DataFrame({**numeric_data, **categorical_data})
+    
+    # 열 타입 명시적 지정
+    numeric_columns = list(numeric_data.keys())
+    categorical_columns = list(categorical_data.keys())
+    
+    for col in numeric_columns:
+        if 'int' in str(df[col].dtype):
+            df[col] = df[col].astype('Int64')
+        elif 'float' in str(df[col].dtype):
+            df[col] = df[col].astype('float64')
+    
+    for col in categorical_columns:
+        df[col] = df[col].astype('string')
     
     return df 
