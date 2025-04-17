@@ -1,23 +1,22 @@
-# pages/prediction1.py
-
 import sys
 from pathlib import Path
 
-# 프로젝트 루트를 PYTHONPATH에 추가
+# 1. 프로젝트 루트를 PYTHONPATH에 추가
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from models.churn_model import ChurnPredictor
-
+# 2. 필요한 모듈 임포트
+from models.churn_model import ChurnPredictor, load_xgboost_model2
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
+# 3. 페이지 설정
 st.set_page_config(page_title="고객 이탈 예측", layout="wide")
 st.title("고객 이탈 예측 페이지")
 
-# 1) 고객 정보 입력
+# 4. 고객 정보 입력 섹션
 st.header("1) 고객 정보 입력")
 c1, c2, c3 = st.columns(3)
 with c1:
@@ -30,6 +29,7 @@ with c3:
     coupon = st.number_input("쿠폰 사용 횟수", 0, 100, 2)
     cashback = st.number_input("캐시백 금액 (원)", 0.0, 10000.0, 150.0)
 
+# 5. 예측 버튼
 if st.button("이탈 예측하기"):
     # 입력값 DataFrame 생성
     input_df = pd.DataFrame([{
@@ -41,12 +41,15 @@ if st.button("이탈 예측하기"):
         "CashbackAmount": cashback
     }])
 
-    # 예측 수행
-    predictor = ChurnPredictor()
+    # 모델 로드 및 예측
+    model = load_xgboost_model2()
+    predictor = ChurnPredictor(model_path=None)
+    predictor.model = model  # 수동 주입
+
     pred, proba = predictor.predict(input_df)
     prob_pct = float(proba[0]) * 100
 
-    # 2) 이탈율 위험도 게이지바
+    # 6. 이탈 위험도 게이지바
     st.header("2) 이탈율 위험도 게이지바")
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge+number",
@@ -54,17 +57,17 @@ if st.button("이탈 예측하기"):
         number={'suffix': '%'},
         gauge={
             'axis': {'range': [0, 100]},
+            'bar': {'color': 'darkblue'},
             'steps': [
                 {'range': [0, 30], 'color': 'green'},
                 {'range': [30, 70], 'color': 'yellow'},
                 {'range': [70, 100], 'color': 'red'},
-            ],
-            'bar': {'color': 'darkblue'}
+            ]
         }
     ))
     st.plotly_chart(fig_gauge, use_container_width=True)
 
-    # 3) 주요 영향 요인
+    # 7. 주요 영향 요인
     st.header("3) 주요 영향 요인")
     fi = predictor.get_feature_importance()
     if isinstance(fi, dict):
