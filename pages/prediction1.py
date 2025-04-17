@@ -9,8 +9,8 @@ import os
 from components.header import show_header
 from components.animations import add_page_transition
 
-# 모델 경로 설정
-MODEL_PATH = Path(os.path.dirname(__file__)) / ".." / "models" / "xgb_best_model.pkl"
+# 모델 경로 설정 (수정)
+MODEL_PATH = Path(os.path.dirname(__file__)) / ".." / "models" / "xgboost_best_model.pkl"
 
 # 모델과 전처리 클래스 정의
 class ChurnPredictor:
