@@ -23,14 +23,11 @@ if uploaded_file:
     df = pd.read_csv(uploaded_file)
     st.success(f"✅ {df.shape[0]}명의 고객 데이터가 로드되었습니다.")
 
-    # 임의 ID 생성
     df["RandomID"] = [str(uuid.uuid4())[:8] for _ in range(len(df))]
 
-    # 모델 로드 및 예측
     model = load_xgboost_model2()
     predictor = ChurnPredictor2(external_model=model)
 
-    # 필요한 칼럼이 모두 있는지 확인 후 처리
     required_features = [
         'Tenure', 'CityTier', 'WarehouseToHome', 'HourSpendOnApp',
         'NumberOfDeviceRegistered', 'SatisfactionScore', 'NumberOfAddress',
@@ -45,11 +42,9 @@ if uploaded_file:
         st.warning(f"⚠️ 다음 컬럼이 누락되어 분석이 불가합니다: {missing_cols}")
         st.stop()
 
-    # 예측 수행
     pred_df = df[required_features + ["RandomID"]].copy()
     df_encoded = pd.get_dummies(pred_df.drop(columns="RandomID"))
 
-    # 모델이 요구하는 모든 컬럼 맞춤
     model_features = predictor.model.get_booster().feature_names
     for col in model_features:
         if col not in df_encoded.columns:
@@ -59,7 +54,6 @@ if uploaded_file:
     _, y_proba = predictor.predict(df_encoded)
     df["ChurnProbability"] = y_proba
 
-    # 위험군 분류
     def risk_group(p):
         if p >= 0.9:
             return "초고위험군"
@@ -72,14 +66,12 @@ if uploaded_file:
 
     df["RiskGroup"] = df["ChurnProbability"].apply(risk_group)
 
-    # 📌 군별 ID 나열
     st.subheader("📌 군별 고객 ID")
     for group in ["초고위험군", "고위험군", "주의단계", "관찰단계"]:
         st.markdown(f"**{group}**")
         group_ids = df[df["RiskGroup"] == group]["RandomID"].tolist()
         st.write(group_ids)
 
-    # 🔍 특정 고객 선택
     st.subheader("👤 고객 ID 선택")
     selected_id = st.selectbox("분석할 고객 ID 선택", df["RandomID"].unique())
     selected_row = df[df["RandomID"] == selected_id].iloc[0]
@@ -106,17 +98,31 @@ if uploaded_file:
     ))
     st.plotly_chart(fig, use_container_width=True)
 
-    # 📊 입력값 수정 인터페이스
     st.subheader("⚙ 고객 데이터 튜닝")
+
+    def reverse_one_hot(row, prefix):
+        matched = [col for col in row.index if col.startswith(prefix + '_') and row[col] == 1]
+        if matched:
+            return matched[0].replace(prefix + '_', '')
+        return "Unknown"
+
+    reverse_cols = [
+        'PreferredLoginDevice', 'PreferredPaymentMode', 'Gender',
+        'PreferedOrderCat', 'MaritalStatus'
+    ]
+
+    one_hot_columns = [col for col in df_encoded.columns if any(col.startswith(prefix + '_') for prefix in reverse_cols)]
+    encoded_row = df_encoded.loc[df[df["RandomID"] == selected_id].index[0]]
+
     modified_inputs = {}
     for col in required_features:
-        val = selected_row[col]
-        if isinstance(val, (int, float)):
-            modified_inputs[col] = st.number_input(col, value=float(val))
+        if col in reverse_cols:
+            decoded_val = reverse_one_hot(encoded_row, col)
+            modified_inputs[col] = st.selectbox(col, sorted(set(df[col])), index=sorted(set(df[col])).index(decoded_val))
         else:
-            modified_inputs[col] = st.text_input(col, value=str(val))
+            val = selected_row[col]
+            modified_inputs[col] = st.number_input(col, value=float(val))
 
-    # 🔁 변동 예측
     if st.button("변동 예측하기"):
         df_mod = pd.DataFrame([modified_inputs])
         df_encoded2 = pd.get_dummies(df_mod)
@@ -149,7 +155,6 @@ if uploaded_file:
         ))
         st.plotly_chart(fig2, use_container_width=True)
 
-        # 🎯 중요도
         st.subheader("🎯 예측에 영향을 준 주요 요인")
         processed = predictor._preprocess_data(df_mod)
         _ = predictor._compute_feature_importance(processed)
