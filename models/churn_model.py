@@ -61,41 +61,25 @@ class ChurnPredictor:
             tuple: (예측 클래스, 이탈 확률)
         """
         try:
-            # 모델이 없으면 로드 시도
-            if self.model is None:
-                self.load_model()
-                
-            # 모델 로드 실패 시 기본값 반환
-            if self.model is None:
-                return self._default_prediction()
-            
             # 데이터 전처리
             processed_df = self._preprocess_data(input_df)
             
             # 예측 수행
+            y_pred = self.model.predict(processed_df)
+            y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+            
+            # 성공적으로 예측한 경우 특성 중요도 계산
             try:
-                y_pred = self.model.predict(processed_df)
-                y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
-                
-                # 예측 결과 확인
-                if len(y_proba) == 0:
-                    return self._default_prediction()
-                
-                # 성공적으로 예측한 경우 특성 중요도 계산
-                try:
-                    self._compute_feature_importance(processed_df)
-                except Exception as e:
-                    # 특성 중요도 계산 실패해도 예측 결과는 반환
-                    pass
-                
-                return y_pred, y_proba
+                self._compute_feature_importance(processed_df)
             except Exception as e:
-                logger.error(f"예측 오류: {str(e)}")
-                return self._default_prediction()
-                
+                # 특성 중요도 계산 실패해도 예측 결과는 반환
+                pass
+            
+            return y_pred, y_proba
         except Exception as e:
-            logger.error(f"예측 처리 중 오류: {str(e)}")
-            return self._default_prediction()
+            logger.error(f"예측 오류: {str(e)}")
+            # 예측 실패 시 빈 배열이 아닌 None 반환
+            return None, None
     
     def _default_prediction(self):
         """기본 예측값 반환"""
@@ -124,7 +108,42 @@ class ChurnPredictor:
         if 'Complain' in df.columns and isinstance(df['Complain'].iloc[0], str):
             df['Complain'] = df['Complain'].apply(lambda x: 1 if x == '예' else 0)
         
+        # 디버그 출력 추가
+        st.write(f"🔍 디버그: 데이터 전처리 완료 - 컬럼 수: {len(df.columns)}")
+        st.write(f"🔍 디버그: 전처리된 컬럼: {df.columns.tolist()}")
+        
         return df
+    
+    def get_onehot_encoded_features(self):
+        """
+        모델의 원핫인코딩된 특성들을 추출합니다.
+        
+        Returns:
+            dict: {원본 특성명: [원핫인코딩된 컬럼들]} 형태의 사전
+        """
+        # 모델이 없거나 feature_names_in_ 속성이 없는 경우
+        if self.model is None or not hasattr(self.model, 'feature_names_in_'):
+            return {}
+            
+        # 모델의 특성 이름 가져오기
+        feature_names = self.model.feature_names_in_
+        
+        # 원핫인코딩 패턴 찾기 (예: Gender_Male, Gender_Female)
+        encoded_features = {}
+        
+        # 가능한 접두사 목록 (범주형 변수들)
+        possible_prefixes = [
+            'Gender', 'MaritalStatus', 'PreferredLoginDevice', 
+            'PreferredPaymentMode', 'PreferedOrderCat'
+        ]
+        
+        # 각 접두사에 대해 관련 특성 검색
+        for prefix in possible_prefixes:
+            prefix_cols = [f for f in feature_names if f.startswith(f"{prefix}_")]
+            if prefix_cols:
+                encoded_features[prefix] = prefix_cols
+                
+        return encoded_features
     
     def _compute_feature_importance(self, input_data):
         """Calculate feature importance for a prediction."""
