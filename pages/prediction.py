@@ -449,7 +449,11 @@ def show():
                     
                     # 영향 요인 계산 (모델 기반)
                     feature_importance = predictor.get_feature_importance()
-                    if feature_importance and isinstance(feature_importance, dict):
+                    
+                    # NumPy 배열에 대한 직접 불리언 평가 방지
+                    is_valid_dict = isinstance(feature_importance, dict)
+                    
+                    if is_valid_dict:
                         # 특성 중요도를 리스트로 변환
                         factors = [
                             {"name": column_korean_names.get(feature, feature), 
