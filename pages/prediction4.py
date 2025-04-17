@@ -87,66 +87,47 @@ if uploaded_file:
     df["이탈확률"] = y_proba
     df["위험군"] = df["이탈확률"].apply(classify_risk)
 
-    df_recovered = reverse_one_hot_columns(df_encoded)
-    df_recovered["고객ID"] = df["고객ID"]
-    df_recovered["이탈확률"] = df["이탈확률"]
-    df_recovered["위험군"] = df["위험군"]
+    # 위험군별 고객 ID (상위 10개씩)
+    st.subheader("📌 위험군별 고객 ID (상위 10개)")
+    for group in ["초고위험군", "고위험군", "주의단계", "관찰단계"]:
+        st.markdown(f"**{group}**")
+        top_ids = df[df["위험군"] == group].nlargest(10, "이탈확률")["고객ID"].tolist()
+        st.write(top_ids)
 
-    # 고객 ID 선택
-    st.subheader("👤 고객 ID 선택")
-    selected_id = st.selectbox("분석할 고객 ID 선택", df_recovered["고객ID"].unique())
-    selected_row = df_recovered[df_recovered["고객ID"] == selected_id].iloc[0]
-
-    st.subheader("📈 이탈 확률 게이지")
-    prob_pct = float(selected_row["이탈확률"] * 100)
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=prob_pct,
-        number={'suffix': '%'},
-        title={"text": "이탈 가능성 (%)"},
-        gauge={
-            'axis': {'range': [0, 100]},
-            'bar': {'color': 'darkblue'},
-            'steps': [
-                {'range': [0, 30], 'color': 'green'},
-                {'range': [30, 50], 'color': 'yellowgreen'},
-                {'range': [50, 70], 'color': 'yellow'},
-                {'range': [70, 90], 'color': 'orange'},
-                {'range': [90, 100], 'color': 'red'}
-            ]
-        }
-    ))
-    st.plotly_chart(fig, use_container_width=True)
+    st.subheader("👤 고객 선택 및 데이터 튜닝")
+    selected_id = st.selectbox("고객 ID 선택", df["고객ID"].unique())
+    selected_row = df[df["고객ID"] == selected_id].iloc[0]
 
     st.subheader("⚙ 고객 데이터 튜닝")
-
-    # 18개 항목을 3열 6행으로 구성
-    rows = [st.columns(3) for _ in range(6)]
     updated_values = {}
+    rows = [st.columns(3) for _ in range(6)]
 
-    updated_values["이용 기간"] = rows[0][0].number_input("이용 기간 (개월)", min_value=0, value=int(selected_row["이용 기간"]))
-    updated_values["거주 도시 등급"] = rows[0][1].selectbox("거주 도시 등급 (1~3)", [1, 2, 3], index=int(selected_row["거주 도시 등급"])-1)
-    updated_values["창고-집 거리"] = rows[0][2].number_input("창고-집 거리 (km)", min_value=0.0, value=float(selected_row["창고-집 거리"]))
+    # 3열 6행으로 각 항목 UI 배치 (선택 시 예외 방지)
+    def safe_number(col, default=0.0):
+        try:
+            val = float(selected_row[col])
+            return val if val >= 0 else default
+        except:
+            return default
 
-    updated_values["앱 사용 시간"] = rows[1][0].number_input("앱 사용 시간 (시간)", min_value=0.0, value=float(selected_row["앱 사용 시간"]))
-    updated_values["등록된 기기 수"] = rows[1][1].number_input("등록된 기기 수", min_value=0, value=int(selected_row["등록된 기기 수"]))
-    updated_values["만족도 점수"] = rows[1][2].slider("만족도 점수 (1~5)", 1, 5, int(selected_row["만족도 점수"]))
-
-    updated_values["배송지 등록 수"] = rows[2][0].number_input("배송지 등록 수", min_value=0, value=int(selected_row["배송지 등록 수"]))
-    updated_values["불만 제기 여부"] = rows[2][1].selectbox("불만 제기 유무", ["예", "아니오"], index=0 if int(selected_row["불만 제기 여부"]) == 1 else 1)
-    updated_values["주문금액 상승률"] = rows[2][2].number_input("주문금액 상승률 (%)", min_value=0.0, value=float(selected_row["주문금액 상승률"]))
-
-    updated_values["쿠폰 사용 횟수"] = rows[3][0].number_input("쿠폰 사용 횟수", min_value=0, value=int(selected_row["쿠폰 사용 횟수"]))
-    updated_values["주문 횟수"] = rows[3][1].number_input("주문 횟수", min_value=0, value=int(selected_row["주문 횟수"]))
-    updated_values["마지막 주문 후 경과일"] = rows[3][2].number_input("마지막 주문 후 경과일", min_value=0, value=int(selected_row["마지막 주문 후 경과일"]))
-
-    updated_values["캐시백 금액"] = rows[4][0].number_input("캐시백 금액", min_value=0, value=int(selected_row["캐시백 금액"]))
-    updated_values["선호 로그인 기기"] = rows[4][1].selectbox("선호 로그인 기기", ["Mobile Phone", "Phone"], index=["Mobile Phone", "Phone"].index(selected_row["선호 로그인 기기"]))
+    updated_values["이용 기간"] = rows[0][0].number_input("이용 기간 (개월)", min_value=0, value=int(safe_number("이용 기간")))
+    updated_values["거주 도시 등급"] = rows[0][1].selectbox("거주 도시 등급 (1~3)", [1, 2, 3], index=int(safe_number("거주 도시 등급")) - 1)
+    updated_values["창고-집 거리"] = rows[0][2].number_input("창고-집 거리 (km)", min_value=0.0, value=safe_number("창고-집 거리"))
+    updated_values["앱 사용 시간"] = rows[1][0].number_input("앱 사용 시간 (시간)", min_value=0.0, value=safe_number("앱 사용 시간"))
+    updated_values["등록된 기기 수"] = rows[1][1].number_input("등록된 기기 수", min_value=0, value=int(safe_number("등록된 기기 수")))
+    updated_values["만족도 점수"] = rows[1][2].slider("만족도 점수 (1~5)", 1, 5, int(safe_number("만족도 점수")))
+    updated_values["배송지 등록 수"] = rows[2][0].number_input("배송지 등록 수", min_value=0, value=int(safe_number("배송지 등록 수")))
+    updated_values["불만 제기 여부"] = rows[2][1].selectbox("불만 제기 여부", ["예", "아니오"], index=0 if selected_row["불만 제기 여부"] == "예" else 1)
+    updated_values["주문금액 상승률"] = rows[2][2].number_input("주문금액 상승률 (%)", min_value=0.0, value=safe_number("주문금액 상승률"))
+    updated_values["쿠폰 사용 횟수"] = rows[3][0].number_input("쿠폰 사용 횟수", min_value=0, value=int(safe_number("쿠폰 사용 횟수")))
+    updated_values["주문 횟수"] = rows[3][1].number_input("주문 횟수", min_value=0, value=int(safe_number("주문 횟수")))
+    updated_values["마지막 주문 후 경과일"] = rows[3][2].number_input("마지막 주문 후 경과일", min_value=0, value=int(safe_number("마지막 주문 후 경과일")))
+    updated_values["캐시백 금액"] = rows[4][0].number_input("캐시백 금액", min_value=0, value=int(safe_number("캐시백 금액")))
+    updated_values["선호 로그인 기기"] = rows[4][1].selectbox("선호 로그인 기기", ["Mobile Phone", "Phone"], index=0)
     updated_values["선호 결제 방식"] = rows[4][2].selectbox("선호 결제 방식", ["Credit Card", "Debit Card", "Cash on Delivery", "COD", "E wallet", "UPI"], index=0)
-
-    updated_values["성별"] = rows[5][0].selectbox("성별", ["Male", "Female"], index=["Male", "Female"].index(selected_row["성별"]))
+    updated_values["성별"] = rows[5][0].selectbox("성별", ["Male", "Female"], index=0)
     updated_values["선호 주문 카테고리"] = rows[5][1].selectbox("선호 주문 카테고리", ["Mobile", "Mobile Phone", "Laptop & Accessory", "Grocery"], index=0)
-    updated_values["결혼 여부"] = rows[5][2].selectbox("결혼 유무", ["Single", "Married"], index=["Single", "Married"].index(selected_row["결혼 여부"]))
+    updated_values["결혼 여부"] = rows[5][2].selectbox("결혼 여부", ["Single", "Married"], index=0)
 
     if st.button("변동 예측하기"):
         df_updated = pd.DataFrame([updated_values])
