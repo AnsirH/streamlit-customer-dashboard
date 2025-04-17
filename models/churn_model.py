@@ -58,33 +58,115 @@ class ChurnPredictor:
             input_df (pandas.DataFrame): 예측할 고객 데이터
             
         Returns:
-            tuple: (예측 클래스, 이탈 확률)
+            tuple: (예측 클래스, 이탈 확률) 또는 오류 발생 시 (None, None)
         """
         try:
-            # 데이터 전처리
+            # 1. 입력 데이터 검증
+            if input_df is None or len(input_df) == 0:
+                st.error("⚠️ 예측할 데이터가 없습니다.")
+                return None, None
+                
+            # 2. 모델 검증
+            if self.model is None:
+                st.error("⚠️ 모델이 로드되지 않았습니다.")
+                if self.load_model() is False:
+                    return None, None
+            
+            # 3. 입력 데이터의 범주형 변수 값이 모델과 호환되는지 미리 검증
+            safe_prediction, unknown_values = self._validate_categorical_values(input_df)
+            
+            # 4. 모델이 인식하지 못하는 범주값이 있는 경우
+            if not safe_prediction:
+                # 4.1 엄격한 모드: 예측 중단
+                if self.strict_mode:
+                    st.error("⚠️ 모델이 인식하지 못하는 범주값이 있어 예측을 중단합니다.")
+                    for cat, values in unknown_values.items():
+                        st.error(f"- '{cat}' 변수에 알 수 없는 값: {values}")
+                    return None, None
+                # 4.2 유연한 모드: 경고 표시 후 계속 진행 (자동 대체)
+                else:
+                    st.warning("⚠️ 모델이 인식하지 못하는 범주값이 있습니다. 자동 대체 사용.")
+                    for cat, values in unknown_values.items():
+                        st.warning(f"- '{cat}' 변수에 알 수 없는 값: {values}")
+            
+            # 5. 데이터 전처리
             processed_df = self._preprocess_data(input_df)
             
-            # 예측 수행
-            y_pred = self.model.predict(processed_df)
-            y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
-            
-            # 성공적으로 예측한 경우 특성 중요도 계산
+            # 6. 예측 수행
             try:
-                self._compute_feature_importance(processed_df)
+                y_pred = self.model.predict(processed_df)
+                y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+                
+                # 7. 불확실성 정보 추가 (모델이 인식하지 못하는 범주값이 있는 경우)
+                if not safe_prediction and not self.strict_mode:
+                    # 7.1 예측 불확실성 경고
+                    st.warning("⚠️ 모델이 인식하지 못하는 범주값이 있어 예측 결과의 신뢰도가 낮을 수 있습니다.")
+                    # 7.2 불확실성을 반영한 확률 조정 (선택 사항)
+                    # y_proba = self._adjust_probability_for_uncertainty(y_proba, unknown_values)
+                
+                # 8. 예측 성공 시 특성 중요도 계산 (선택 사항)
+                try:
+                    self._compute_feature_importance(processed_df)
+                except Exception as e:
+                    # 특성 중요도 계산 실패해도 예측 결과는 반환
+                    pass
+                
+                return y_pred, y_proba
+                
             except Exception as e:
-                # 특성 중요도 계산 실패해도 예측 결과는 반환
-                pass
-            
-            return y_pred, y_proba
+                st.error(f"⚠️ 예측 수행 중 오류: {str(e)}")
+                return None, None
+        
         except Exception as e:
-            logger.error(f"예측 오류: {str(e)}")
-            # 예측 실패 시 빈 배열이 아닌 None 반환
+            st.error(f"⚠️ 예측 처리 중 오류: {str(e)}")
+            import traceback
+            st.write(f"🔍 [예측 오류]: {traceback.format_exc()}")
             return None, None
     
-    def _default_prediction(self):
-        """기본 예측값 반환"""
-        return np.array([0]), np.array([0.5])
-    
+    def _validate_categorical_values(self, input_df):
+        """
+        입력 데이터의 범주형 변수 값이 모델과 호환되는지 검증합니다.
+        
+        Args:
+            input_df (pd.DataFrame): 검증할 입력 데이터
+            
+        Returns:
+            tuple: (안전한 예측 여부, 알 수 없는 값 목록)
+        """
+        # 1. 기본값 설정
+        is_safe = True
+        unknown_values = {}
+        
+        # 2. 모델이 없는 경우 검증 불가
+        if self.model is None or not hasattr(self.model, 'feature_names_in_'):
+            return True, {}  # 검증 불가하므로 안전하다고 가정
+            
+        # 3. 원핫인코딩된 특성 구조 가져오기
+        encoded_features = self.get_onehot_encoded_features()
+        
+        # 4. 각 범주형 변수별 가능한 값 목록 추출
+        category_values = {}
+        for prefix, features in encoded_features.items():
+            category_values[prefix] = [f.split('_', 1)[1] for f in features]
+        
+        # 5. 입력 데이터의 각 범주형 변수 검증
+        for prefix in encoded_features.keys():
+            if prefix in input_df.columns:
+                # 5.1 입력 데이터의 해당 컬럼 고유값 가져오기
+                input_values = input_df[prefix].astype(str).str.strip().unique()
+                
+                # 5.2 모델이 인식하지 못하는 값 찾기
+                possible_values = [str(v).lower() for v in category_values.get(prefix, [])]
+                unknown = [val for val in input_values 
+                          if str(val).lower() not in possible_values]
+                
+                # 5.3 알 수 없는 값이 있으면 기록
+                if unknown:
+                    is_safe = False
+                    unknown_values[prefix] = unknown
+        
+        return is_safe, unknown_values
+
     def _preprocess_data(self, data):
         """
         모델 예측을 위해 입력 데이터를 전처리합니다.
@@ -97,6 +179,9 @@ class ChurnPredictor:
             pd.DataFrame: 모델 입력에 맞게 전처리된 데이터
         """
         try:
+            # 0. 모델 설정 확인
+            self.strict_mode = False  # 기본적으로 유연한 모드 사용 (예측 계속 진행)
+            
             # 1. 원본 데이터 로깅
             st.write(f"🔍 [전처리]: 원본 데이터 크기: {data.shape}")
             
@@ -124,7 +209,6 @@ class ChurnPredictor:
             category_values = {}
             for prefix, features in encoded_features_dict.items():
                 category_values[prefix] = [f.split('_', 1)[1] for f in features]
-                st.write(f"🔍 [전처리]: '{prefix}'의 가능한 값 ({len(category_values[prefix])}개): {category_values[prefix]}")
             
             # 7. 새 결과 데이터프레임 생성 (모델이 필요로 하는 모든 특성을 포함하게 됨)
             result_df = pd.DataFrame(index=data.index)
