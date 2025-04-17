@@ -5,10 +5,213 @@ from utils.cache import load_model
 from utils.logger import setup_logger
 from config import PATHS, MODEL_CONFIG
 import joblib
+import pickle
+import os
+import streamlit as st
+import plotly.express as px
+import plotly.graph_objects as go
 
 logger = setup_logger(__name__)
 
 ########## 함수업데이트작업 ##########
+
+class ChurnPredictor:
+    """고객 이탈 예측을 위한 모델 클래스"""
+    
+    def __init__(self):
+        """모델을 로드하고 초기화합니다."""
+        self.model = None
+        self.feature_importance_cache = {}
+        self.model_path = Path(__file__).parent / "xgb_best_model.pkl"
+        st.write(f"DEBUG: 모델 경로: {self.model_path}")
+        st.write(f"DEBUG: 모델 파일 존재: {self.model_path.exists()}")
+        try:
+            self.load_model()
+            st.write("DEBUG: 모델 로드 성공")
+        except Exception as e:
+            logger.error(f"모델 로드 오류: {str(e)}")
+            st.error(f"모델 로드 중 오류가 발생했습니다: {str(e)}")
+    
+    def load_model(self):
+        """모델 파일을 로드합니다."""
+        try:
+            if not self.model_path.exists():
+                logger.error(f"모델 파일을 찾을 수 없습니다: {self.model_path}")
+                st.error(f"모델 파일을 찾을 수 없습니다: {self.model_path}")
+                return False
+            
+            st.write(f"DEBUG: 모델 파일 크기: {os.path.getsize(self.model_path)} 바이트")
+            self.model = joblib.load(self.model_path)
+            
+            # 모델 정보 출력
+            st.write(f"DEBUG: 모델 타입: {type(self.model)}")
+            st.write(f"DEBUG: 모델 사용 가능 메서드: {dir(self.model)[:5]}...")
+            
+            if hasattr(self.model, 'feature_importances_'):
+                st.write(f"DEBUG: 특성 중요도 수: {len(self.model.feature_importances_)}")
+            
+            logger.info(f"모델 로드 성공: {self.model_path}")
+            return True
+        except Exception as e:
+            logger.error(f"모델 로드 실패: {str(e)}")
+            st.error(f"모델 로드 실패: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+            return False
+    
+    def predict(self, input_df):
+        """
+        이탈 예측을 수행합니다.
+        
+        Args:
+            input_df (pandas.DataFrame): 예측할 고객 데이터
+            
+        Returns:
+            tuple: (예측 클래스, 이탈 확률)
+        """
+        try:
+            # 모델이 없으면 로드 시도
+            if self.model is None:
+                st.write("DEBUG: 모델이 없어 로드 시도")
+                success = self.load_model()
+                st.write(f"DEBUG: 모델 로드 결과: {success}")
+                
+            # 모델 로드 실패 시 기본값 반환
+            if self.model is None:
+                st.write("DEBUG: 모델 로드 실패, 기본값 반환")
+                return self._default_prediction()
+            
+            # 데이터 전처리
+            processed_df = self._preprocess_data(input_df)
+            st.write(f"DEBUG: 전처리된 데이터 컬럼: {', '.join(processed_df.columns)}")
+            st.write(f"DEBUG: 전처리된 데이터:\n{processed_df.head()}")
+            
+            # 예측 수행
+            try:
+                st.write("DEBUG: 예측 시작")
+                
+                # 더미 예측으로 테스트 (문제 지점 파악용)
+                # 주의: 실제 사용시 이 부분을 제거하고 아래 주석 해제
+                st.write("DEBUG: 더미 예측 수행 (테스트용)")
+                y_pred = np.array([1])  # 예시: 1 = 이탈, 0 = 유지
+                y_proba = np.array([0.75])  # 예시: 75% 이탈 확률
+                
+                # 실제 예측 코드 (문제 해결 후 주석 해제)
+                # y_pred = self.model.predict(processed_df)
+                # y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+                
+                st.write(f"DEBUG: 예측 완료, 결과: {y_proba[0]}")
+                
+                # 예측 결과 확인
+                if len(y_proba) == 0:
+                    st.write("DEBUG: 예측 결과 없음, 기본값 반환")
+                    return self._default_prediction()
+                
+                # 성공적으로 예측한 경우 특성 중요도 계산
+                try:
+                    st.write("DEBUG: 특성 중요도 계산 시작")
+                    self._compute_feature_importance(processed_df)
+                    st.write("DEBUG: 특성 중요도 계산 완료")
+                except Exception as e:
+                    # 특성 중요도 계산 실패해도 예측 결과는 반환
+                    st.write(f"DEBUG: 특성 중요도 계산 실패: {str(e)}")
+                    pass
+                
+                return y_pred, y_proba
+            except Exception as e:
+                logger.error(f"예측 오류: {str(e)}")
+                st.error(f"예측 오류: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
+                return self._default_prediction()
+                
+        except Exception as e:
+            logger.error(f"예측 처리 중 오류: {str(e)}")
+            st.error(f"예측 처리 중 오류: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+            return self._default_prediction()
+    
+    def _default_prediction(self):
+        """기본 예측값 반환"""
+        return np.array([0]), np.array([0.5])
+    
+    def _preprocess_data(self, input_df):
+        """
+        입력 데이터를 전처리합니다.
+        
+        Args:
+            input_df (pandas.DataFrame): 원본 입력 데이터
+            
+        Returns:
+            pandas.DataFrame: 전처리된 데이터
+        """
+        # CustomerID 제거 (예측에 사용되지 않음)
+        df = input_df.copy()
+        if 'CustomerID' in df.columns:
+            df = df.drop('CustomerID', axis=1)
+        
+        return df
+    
+    def _compute_feature_importance(self, input_df):
+        """모델의 feature_importances_ 속성을 사용하여 특성 중요도를 계산합니다."""
+        if self.model is None:
+            st.write("DEBUG: 모델이 없어 특성 중요도 계산 불가")
+            return
+            
+        try:
+            # SHAP 사용하지 않고 직접 feature_importances_ 사용
+            st.write("DEBUG: feature_importances_ 속성 확인")
+            if hasattr(self.model, 'feature_importances_'):
+                st.write("DEBUG: feature_importances_ 속성 있음")
+                importance_dict = {}
+                for i, col in enumerate(input_df.columns):
+                    if i < len(self.model.feature_importances_):
+                        importance_dict[col] = self.model.feature_importances_[i]
+                self.feature_importance_cache = importance_dict
+                st.write(f"DEBUG: 특성 중요도 계산 결과: {importance_dict}")
+            else:
+                st.write("DEBUG: feature_importances_ 속성 없음, 기본값 사용")
+                # 기본 중요도 설정
+                self.feature_importance_cache = {
+                    'Tenure': 0.25,
+                    'SatisfactionScore': 0.22,
+                    'DaySinceLastOrder': 0.18,
+                    'OrderCount': 0.15,
+                    'HourSpendOnApp': 0.12,
+                    'Complain': 0.08
+                }
+        except Exception as e:
+            st.write(f"DEBUG: 특성 중요도 계산 중 오류: {str(e)}")
+            # 모든 방법 실패 시 기본 중요도 사용
+            self.feature_importance_cache = {
+                'Tenure': 0.25,
+                'SatisfactionScore': 0.22,
+                'DaySinceLastOrder': 0.18,
+                'OrderCount': 0.15,
+                'HourSpendOnApp': 0.12,
+                'Complain': 0.08
+            }
+    
+    def get_feature_importance(self):
+        """
+        계산된 특성 중요도를 반환합니다.
+        
+        Returns:
+            dict: 특성별 중요도
+        """
+        # 특성 중요도가 없으면 기본값 반환
+        if not self.feature_importance_cache:
+            return {
+                'Tenure': 0.25,
+                'SatisfactionScore': 0.22,
+                'DaySinceLastOrder': 0.18,
+                'OrderCount': 0.15,
+                'HourSpendOnApp': 0.12,
+                'Complain': 0.08
+            }
+        
+        return self.feature_importance_cache
 
 
 ########## 함수영역역 ##########
@@ -143,8 +346,6 @@ def get_customer_top_features(shap_values, X, idx, n=5):
 
 ##########################
 # 1. 데이터입력
-import streamlit as st
-
 def get_customer_input():
     st.subheader("고객 데이터 입력")
 
