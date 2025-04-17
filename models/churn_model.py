@@ -5,10 +5,131 @@ from utils.cache import load_model
 from utils.logger import setup_logger
 from config import PATHS, MODEL_CONFIG
 import joblib
+import shap
+import pickle
+import os
+import streamlit as st
+import plotly.express as px
+import plotly.graph_objects as go
 
 logger = setup_logger(__name__)
 
 ########## 함수업데이트작업 ##########
+
+class ChurnPredictor:
+    """고객 이탈 예측을 위한 모델 클래스"""
+    
+    def __init__(self):
+        """모델을 로드하고 초기화합니다."""
+        self.model = self._load_model()
+        self.feature_importance_cache = {}
+        
+    def _load_model(self):
+        """모델 파일을 로드합니다."""
+        try:
+            model_path = Path(__file__).parent / "xgb_best_model.pkl"
+            if not model_path.exists():
+                st.error(f"모델 파일을 찾을 수 없습니다: {model_path}")
+                return None
+            
+            return joblib.load(model_path)
+        except Exception as e:
+            st.error(f"모델 로드 중 오류 발생: {str(e)}")
+            return None
+    
+    def predict(self, input_df):
+        """
+        이탈 예측을 수행합니다.
+        
+        Args:
+            input_df (pandas.DataFrame): 예측할 고객 데이터
+            
+        Returns:
+            tuple: (예측 클래스, 이탈 확률)
+        """
+        try:
+            if self.model is None:
+                # 모델 로드 실패 시 임의의 예측값 반환
+                return np.array([0]), np.array([0.5])
+            
+            # 필요한 전처리
+            processed_df = self._preprocess_data(input_df)
+            
+            # 예측 수행
+            y_pred = self.model.predict(processed_df)
+            y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+            
+            # 예측 데이터 저장 (특성 중요도 계산용)
+            self._compute_feature_importance(processed_df)
+            
+            return y_pred, y_proba
+        except Exception as e:
+            st.error(f"예측 중 오류 발생: {str(e)}")
+            return np.array([0]), np.array([0.5])
+    
+    def _preprocess_data(self, input_df):
+        """
+        입력 데이터를 전처리합니다.
+        
+        Args:
+            input_df (pandas.DataFrame): 원본 입력 데이터
+            
+        Returns:
+            pandas.DataFrame: 전처리된 데이터
+        """
+        # CustomerID 제거 (예측에 사용되지 않음)
+        df = input_df.copy()
+        if 'CustomerID' in df.columns:
+            df = df.drop('CustomerID', axis=1)
+        
+        # 필요한 전처리 작업 수행
+        # 예: 범주형 변수 인코딩, 결측치 처리 등
+        
+        return df
+    
+    def _compute_feature_importance(self, input_df):
+        """SHAP 값을 사용하여 특성 중요도를 계산합니다."""
+        try:
+            if self.model is None:
+                return
+            
+            # 작은 데이터셋에서는 TreeExplainer 사용
+            explainer = shap.TreeExplainer(self.model)
+            shap_values = explainer.shap_values(input_df)
+            
+            # 클래스가 2개인 경우 1번 클래스(이탈)에 대한 SHAP 값 사용
+            if isinstance(shap_values, list):
+                shap_values = shap_values[1]
+            
+            # 특성별 중요도 계산
+            importance_dict = {}
+            for i, col in enumerate(input_df.columns):
+                importance_dict[col] = np.abs(shap_values[0][i])
+            
+            self.feature_importance_cache = importance_dict
+        except Exception as e:
+            st.warning(f"특성 중요도 계산 중 오류: {str(e)}")
+    
+    def get_feature_importance(self):
+        """
+        계산된 특성 중요도를 반환합니다.
+        
+        Returns:
+            dict: 특성별 중요도
+        """
+        # 특성 중요도가 없으면 모델의 feature_importances_ 사용
+        if not self.feature_importance_cache and self.model is not None:
+            try:
+                # 모델이 feature_importances_ 속성을 가지고 있는 경우
+                if hasattr(self.model, 'feature_importances_'):
+                    importance_dict = {}
+                    for i, imp in enumerate(self.model.feature_importances_):
+                        importance_dict[f"feature_{i}"] = imp
+                    return importance_dict
+            except:
+                pass
+        
+        return self.feature_importance_cache
 
 
 ########## 함수영역역 ##########

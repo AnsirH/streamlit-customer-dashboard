@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 from components.header import show_header
 from components.animations import add_page_transition
-from models.churn_model import predict_churn
+from models.churn_model import ChurnPredictor
 
 # 게이지 차트 생성
 def create_churn_gauge(value):
@@ -404,15 +404,10 @@ def show():
                     # 고객 ID 표시
                     st.markdown(f"### 고객 ID: {input_data['CustomerID']}")
                     
-                    # 이탈 예측 모델 로드
-                    predictor = predict_churn()
-
-                    # 데이터프레임에서 필요한 특성 선택 (모델 학습에 사용된 특성과 일치해야 함)
-                    # input_df에는 사용자가 입력한 모든 필드가 포함됨
-                    model_input = input_df  # 필요한 경우 특성 선택 또는 전처리
-                    
-                    # 확률 예측 (실제 모델 사용)
-                    prob_value = predictor.predict(model_input)[0]  # 예측 결과는 배열이므로 첫 번째 요소 사용
+                    # 이탈 예측 모델 로드 및 예측
+                    predictor = ChurnPredictor()
+                    _, y_proba = predictor.predict(input_df)
+                    prob_value = y_proba[0]  # 이탈 확률
 
                     # 결과 표시
                     st.markdown("---")
