@@ -1,5 +1,9 @@
 import streamlit as st
 from components.header import show_header
+from components.animations import add_page_transition
+
+# 애니메이션 적용
+add_page_transition()
 
 show_header()
 
