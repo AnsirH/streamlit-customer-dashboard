@@ -111,7 +111,7 @@ if uploaded_file:
             return default
 
     updated_values["이용 기간"] = rows[0][0].number_input("이용 기간 (개월)", min_value=0, value=int(safe_number("이용 기간")))
-    updated_values["거주 도시 등급"] = rows[0][1].selectbox("거주 도시 등급 (1~3)", [1, 2, 3], index=int(safe_number("거주 도시 등급")) - 1)
+    updated_values["거주 도시 등급"] = rows[0][1].selectbox("거주 도시 등급 (1~3)", [1, 2, 3], index=max(int(safe_number("거주 도시 등급")) - 1, 0))
     updated_values["창고-집 거리"] = rows[0][2].number_input("창고-집 거리 (km)", min_value=0.0, value=safe_number("창고-집 거리"))
     updated_values["앱 사용 시간"] = rows[1][0].number_input("앱 사용 시간 (시간)", min_value=0.0, value=safe_number("앱 사용 시간"))
     updated_values["등록된 기기 수"] = rows[1][1].number_input("등록된 기기 수", min_value=0, value=int(safe_number("등록된 기기 수")))
