@@ -107,19 +107,11 @@ class Visualizer:
         # 테이블 스타일 설정
         st.dataframe(
             display_df,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "고객 ID": st.column_config.TextColumn("고객 ID", width="medium"),
-                "이탈 위험도": st.column_config.TextColumn("이탈 위험도", width="small"),
-                "영향 요인 1": st.column_config.TextColumn("영향 요인 1", width="medium"),
-                "중요도 1": st.column_config.TextColumn("중요도 1", width="small"),
-                "영향 요인 2": st.column_config.TextColumn("영향 요인 2", width="medium"),
-                "중요도 2": st.column_config.TextColumn("중요도 2", width="small"),
-                "영향 요인 3": st.column_config.TextColumn("영향 요인 3", width="medium"),
-                "중요도 3": st.column_config.TextColumn("중요도 3", width="small")
-            }
+            use_container_width=True
         )
+        
+        # 테이블이 표시된 후 페이지 새로고침
+        st.experimental_rerun()
 
     @staticmethod
     def create_churn_gauge(probability):

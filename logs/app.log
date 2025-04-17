@@ -1,0 +1,11 @@
+2025-04-17 15:44:06,471 - models.churn_model - INFO - 모델 로드 성공: /Users/jmlee/Desktop/skn_ai_project2/streamlit-customer-dashboard/models/xgb_best_model.pkl
+2025-04-17 15:44:06,472 - models.churn_model - ERROR - 예측 오류: Feature shape mismatch, expected: 28, got 18
+2025-04-17 15:44:25,658 - models.churn_model - INFO - 모델 로드 성공: /Users/jmlee/Desktop/skn_ai_project2/streamlit-customer-dashboard/models/xgb_best_model.pkl
+2025-04-17 15:44:25,660 - models.churn_model - ERROR - 예측 오류: Feature shape mismatch, expected: 28, got 18
+2025-04-17 15:44:34,386 - models.churn_model - INFO - 모델 로드 성공: /Users/jmlee/Desktop/skn_ai_project2/streamlit-customer-dashboard/models/xgb_best_model.pkl
+2025-04-17 15:44:34,389 - models.churn_model - ERROR - 예측 오류: Feature shape mismatch, expected: 28, got 18
+2025-04-17 16:04:16,763 - models.churn_model - INFO - 모델 로드 성공: /Users/jmlee/Desktop/skn_ai_project2/streamlit-customer-dashboard/models/xgb_best_model.pkl
+2025-04-17 16:04:16,766 - models.churn_model - ERROR - 예측 오류: Feature shape mismatch, expected: 28, got 18
+2025-04-17 16:16:25,029 - models.churn_model - INFO - 모델 로드 성공: /Users/jmlee/Desktop/skn_ai_project2/streamlit-customer-dashboard/models/xgb_best_model.pkl
+2025-04-17 16:16:37,238 - models.churn_model - INFO - 모델 로드 성공: /Users/jmlee/Desktop/skn_ai_project2/streamlit-customer-dashboard/models/xgb_best_model.pkl
+2025-04-17 16:16:49,674 - models.churn_model - INFO - 모델 로드 성공: /Users/jmlee/Desktop/skn_ai_project2/streamlit-customer-dashboard/models/xgb_best_model.pkl
