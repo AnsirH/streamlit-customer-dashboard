@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from pathlib import Path
 import sys
 
-# 루트 경로 설정
+# 경로 설정
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
@@ -14,49 +14,81 @@ from models.churn_model import load_xgboost_model2, ChurnPredictor2
 st.set_page_config(page_title="고객 이탈 예측", layout="wide")
 st.title("📊 고객 이탈 예측 시스템")
 
-st.subheader("1️⃣ 필수 입력 필드")
+# --------------------------
+# 1️⃣ UI 입력 섹션 (총 18개)
+# --------------------------
+st.subheader("1️⃣ 고객 데이터 입력")
+
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    tenure = st.number_input("거래 기간 (개월)", min_value=0, value=12)
-    satisfaction = st.slider("만족도 점수 (1~5)", 1, 5, 3)
+    tenure = st.number_input("이용 기간 (개월)", min_value=0, value=12)
+    city_tier = st.selectbox("거주 도시 등급 (1~3)", [1, 2, 3], index=1)
+    warehouse_dist = st.number_input("창고-집 거리 (km)", min_value=0.0, value=20.0)
+    app_hour = st.number_input("앱 사용 시간 (시간)", min_value=0.0, value=2.5)
+    num_devices = st.number_input("등록된 기기 수", min_value=0, value=2)
 
 with col2:
-    hour = st.number_input("앱 사용 시간 (시간)", min_value=0.0, value=3.0)
-    orders = st.number_input("주문 횟수", min_value=0, value=10)
+    satisfaction = st.slider("만족도 점수 (1~5)", 1, 5, 3)
+    num_address = st.number_input("배송지 등록 수", min_value=0, value=1)
+    complain = st.selectbox("불만 제기 여부", ["예", "아니오"])
+    order_hike = st.number_input("주문금액 상승률 (%)", value=10.0)
+    coupon_used = st.number_input("쿠폰 사용 횟수", value=2)
 
 with col3:
-    last_order_days = st.number_input("마지막 주문 후 경과일", min_value=0, value=15)
-    complain = st.selectbox("불만 제기 여부", ["아니오", "예"])
+    orders = st.number_input("주문 횟수", value=8)
+    last_order_days = st.number_input("마지막 주문 후 경과일", value=10)
+    cashback = st.number_input("캐시백 금액", value=150)
 
+    # ✅ 범주형 변수 5개
+    login_device = st.selectbox("선호 로그인 기기", ["Mobile Phone", "Phone"])
+    payment_mode = st.selectbox("선호 결제 방식", [
+        "Credit Card", "Debit Card", "Cash on Delivery", "COD",
+        "E wallet", "UPI"
+    ])
+    gender = st.selectbox("성별", ["Male", "Female"])
+    order_cat = st.selectbox("선호 주문 카테고리", [
+        "Mobile", "Mobile Phone", "Laptop & Accessory", "Grocery"
+    ])
+    marital = st.selectbox("결혼 여부", ["Single", "Married"])
+
+# --------------------------
+# 2️⃣ 예측 버튼 누르면 실행
+# --------------------------
 if st.button("🧠 이탈 예측하기"):
-    # 입력값 구성
-    input_df = pd.DataFrame([{
+
+    # 기본 수치형 + 범주형 코드화 전
+    raw_input = {
         "Tenure": tenure,
-        "HourSpendOnApp": hour,
+        "CityTier": city_tier,
+        "WarehouseToHome": warehouse_dist,
+        "HourSpendOnApp": app_hour,
+        "NumberOfDeviceRegistered": num_devices,
         "SatisfactionScore": satisfaction,
+        "NumberOfAddress": num_address,
+        "Complain": 1 if complain == "예" else 0,
+        "OrderAmountHikeFromlastYear": order_hike,
+        "CouponUsed": coupon_used,
         "OrderCount": orders,
         "DaySinceLastOrder": last_order_days,
-        "Complain": 1 if complain == "예" else 0
-    }])
-
-    # 🔧 평균값 기반 기본값 설정
-    default_values = {
-        'CityTier': 3,  # 낮은 도시 접근성
-        'WarehouseToHome': 50.0,
-        'NumberOfDeviceRegistered': 1,
-        'NumberOfAddress': 0,
-        'OrderAmountHikeFromlastYear': -20.0,  # 주문 하락
-        'CouponUsed': 0,  # 쿠폰 사용 안 함
-        'CashbackAmount': 0,
-        'PreferredLoginDevice_Mobile Phone': 1,
-        'PreferredPaymentMode_UPI': 1,  # 불편 결제
-        'Gender_Male': 0,
-        'PreferedOrderCat_Grocery': 1,
-        'MaritalStatus_Married': 1
+        "CashbackAmount": cashback,
+        "PreferredLoginDevice": login_device,
+        "PreferredPaymentMode": payment_mode,
+        "Gender": gender,
+        "PreferedOrderCat": order_cat,
+        "MaritalStatus": marital
     }
 
-    # 모델 피처 순서 정의
+    df_input = pd.DataFrame([raw_input])
+
+    # ✅ 원-핫 인코딩 대상
+    one_hot_cols = [
+        "PreferredLoginDevice", "PreferredPaymentMode", "Gender",
+        "PreferedOrderCat", "MaritalStatus"
+    ]
+    df_encoded = pd.get_dummies(df_input, columns=one_hot_cols)
+
+    # ✅ 모델 요구 피처 목록
     required_features = [
         'Tenure', 'CityTier', 'WarehouseToHome', 'HourSpendOnApp',
         'NumberOfDeviceRegistered', 'SatisfactionScore', 'NumberOfAddress',
@@ -72,20 +104,18 @@ if st.button("🧠 이탈 예측하기"):
         'MaritalStatus_Married', 'MaritalStatus_Single'
     ]
 
-    # 누락 피처 보정
+    # 누락된 피처는 0으로 채움
     for col in required_features:
-        if col not in input_df.columns:
-            input_df[col] = default_values.get(col, 0)
+        if col not in df_encoded.columns:
+            df_encoded[col] = 0
 
-    # 컬럼 순서 맞추기
-    input_df = input_df[required_features]
+    # 순서 맞춤
+    df_encoded = df_encoded[required_features]
 
     try:
         model = load_xgboost_model2()
         predictor = ChurnPredictor2(external_model=model)
-
-        # 예측
-        y_pred, y_proba = predictor.predict(input_df)
+        y_pred, y_proba = predictor.predict(df_encoded)
         prob_pct = float(y_proba[0]) * 100
 
         # 📈 게이지 차트
@@ -107,8 +137,8 @@ if st.button("🧠 이탈 예측하기"):
         ))
         st.plotly_chart(fig, use_container_width=True)
 
-        # 📊 SHAP 중요도 시각화
-        processed = predictor._preprocess_data(input_df)
+        # 📊 주요 변수 영향 시각화
+        processed = predictor._preprocess_data(df_encoded)
         _ = predictor._compute_feature_importance(processed)
         fi = predictor.get_feature_importance()
 
@@ -124,4 +154,4 @@ if st.button("🧠 이탈 예측하기"):
         st.plotly_chart(fig_bar, use_container_width=True)
 
     except Exception as e:
-        st.error(f"❌ 예측 오류 발생: {str(e)}")
+        st.error(f"❌ 예측 실패: {str(e)}")
