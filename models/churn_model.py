@@ -40,12 +40,23 @@ class ChurnPredictor:
                 st.error(f"모델 파일을 찾을 수 없습니다: {self.model_path}")
                 return False
             
+            st.write(f"DEBUG: 모델 파일 크기: {os.path.getsize(self.model_path)} 바이트")
             self.model = joblib.load(self.model_path)
+            
+            # 모델 정보 출력
+            st.write(f"DEBUG: 모델 타입: {type(self.model)}")
+            st.write(f"DEBUG: 모델 사용 가능 메서드: {dir(self.model)[:5]}...")
+            
+            if hasattr(self.model, 'feature_importances_'):
+                st.write(f"DEBUG: 특성 중요도 수: {len(self.model.feature_importances_)}")
+            
             logger.info(f"모델 로드 성공: {self.model_path}")
             return True
         except Exception as e:
             logger.error(f"모델 로드 실패: {str(e)}")
             st.error(f"모델 로드 실패: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
             return False
     
     def predict(self, input_df):
@@ -62,7 +73,8 @@ class ChurnPredictor:
             # 모델이 없으면 로드 시도
             if self.model is None:
                 st.write("DEBUG: 모델이 없어 로드 시도")
-                self.load_model()
+                success = self.load_model()
+                st.write(f"DEBUG: 모델 로드 결과: {success}")
                 
             # 모델 로드 실패 시 기본값 반환
             if self.model is None:
@@ -72,12 +84,22 @@ class ChurnPredictor:
             # 데이터 전처리
             processed_df = self._preprocess_data(input_df)
             st.write(f"DEBUG: 전처리된 데이터 컬럼: {', '.join(processed_df.columns)}")
+            st.write(f"DEBUG: 전처리된 데이터:\n{processed_df.head()}")
             
             # 예측 수행
             try:
                 st.write("DEBUG: 예측 시작")
-                y_pred = self.model.predict(processed_df)
-                y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+                
+                # 더미 예측으로 테스트 (문제 지점 파악용)
+                # 주의: 실제 사용시 이 부분을 제거하고 아래 주석 해제
+                st.write("DEBUG: 더미 예측 수행 (테스트용)")
+                y_pred = np.array([1])  # 예시: 1 = 이탈, 0 = 유지
+                y_proba = np.array([0.75])  # 예시: 75% 이탈 확률
+                
+                # 실제 예측 코드 (문제 해결 후 주석 해제)
+                # y_pred = self.model.predict(processed_df)
+                # y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+                
                 st.write(f"DEBUG: 예측 완료, 결과: {y_proba[0]}")
                 
                 # 예측 결과 확인
@@ -99,11 +121,15 @@ class ChurnPredictor:
             except Exception as e:
                 logger.error(f"예측 오류: {str(e)}")
                 st.error(f"예측 오류: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
                 return self._default_prediction()
                 
         except Exception as e:
             logger.error(f"예측 처리 중 오류: {str(e)}")
             st.error(f"예측 처리 중 오류: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
             return self._default_prediction()
     
     def _default_prediction(self):
