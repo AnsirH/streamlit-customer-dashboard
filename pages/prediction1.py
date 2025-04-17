@@ -1,22 +1,24 @@
+# pages/prediction1.py
+
 import sys
 from pathlib import Path
 
-# 1. 프로젝트 루트를 PYTHONPATH에 추가
+# 프로젝트 루트 경로 등록
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-# 2. 필요한 모듈 임포트
+# 로컬 모듈 임포트
 from models.churn_model import ChurnPredictor, load_xgboost_model2
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-# 3. 페이지 설정
 st.set_page_config(page_title="고객 이탈 예측", layout="wide")
 st.title("고객 이탈 예측 페이지")
 
-# 4. 고객 정보 입력 섹션
+# 1. 고객 정보 입력
 st.header("1) 고객 정보 입력")
 c1, c2, c3 = st.columns(3)
 with c1:
@@ -29,9 +31,8 @@ with c3:
     coupon = st.number_input("쿠폰 사용 횟수", 0, 100, 2)
     cashback = st.number_input("캐시백 금액 (원)", 0.0, 10000.0, 150.0)
 
-# 5. 예측 버튼
+# 2. 예측 버튼 동작
 if st.button("이탈 예측하기"):
-    # 입력값 DataFrame 생성
     input_df = pd.DataFrame([{
         "Tenure": tenure,
         "WarehouseToHome": warehouse,
@@ -41,7 +42,7 @@ if st.button("이탈 예측하기"):
         "CashbackAmount": cashback
     }])
 
-    # 모델 로드 및 예측
+    # 모델 로드 및 예측 실행
     model = load_xgboost_model2()
     predictor = ChurnPredictor(model_path=None)
     predictor.model = model  # 수동 주입
@@ -49,7 +50,7 @@ if st.button("이탈 예측하기"):
     pred, proba = predictor.predict(input_df)
     prob_pct = float(proba[0]) * 100
 
-    # 6. 이탈 위험도 게이지바
+    # 3. 이탈 위험도 게이지 차트
     st.header("2) 이탈율 위험도 게이지바")
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge+number",
@@ -67,7 +68,7 @@ if st.button("이탈 예측하기"):
     ))
     st.plotly_chart(fig_gauge, use_container_width=True)
 
-    # 7. 주요 영향 요인
+    # 4. 주요 영향 피처 시각화
     st.header("3) 주요 영향 요인")
     fi = predictor.get_feature_importance()
     if isinstance(fi, dict):
@@ -77,6 +78,7 @@ if st.button("이탈 예측하기"):
 
     fi_df = pd.DataFrame(items, columns=['feature', 'importance']) \
                  .sort_values('importance', ascending=False)
+
     fig_bar = go.Figure(go.Bar(x=fi_df['feature'], y=fi_df['importance']))
     fig_bar.update_layout(xaxis_title="피처", yaxis_title="중요도")
     st.plotly_chart(fig_bar, use_container_width=True)
