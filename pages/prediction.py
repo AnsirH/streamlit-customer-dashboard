@@ -6,110 +6,557 @@ from components.header import show_header
 from components.animations import add_page_transition
 from models.churn_model import ChurnPredictor
 
-# --------------------
-# 🔁 캐시된 모델 로딩
-# --------------------
-@st.cache_resource
-def get_predictor():
-    return ChurnPredictor()
-
-# --------------------
-# 🎯 게이지 차트 생성
-# --------------------
-def create_churn_gauge(probability: float) -> go.Figure:
-    risk_percent = probability * 100
+# 게이지 차트 생성
+def create_churn_gauge(value):
     fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=risk_percent,
-        title={"text": "이탈 가능성 (%)"},
-        gauge={
-            'axis': {'range': [0, 100]},
+        mode = "gauge+number",
+        value = value * 100,
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        title = {'text': "이탈 가능성 (%)"},
+        gauge = {
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
+            'bar': {'color': "darkblue"},
+            'bgcolor': "white",
+            'borderwidth': 2,
+            'bordercolor': "gray",
             'steps': [
                 {'range': [0, 30], 'color': 'green'},
                 {'range': [30, 70], 'color': 'yellow'},
                 {'range': [70, 100], 'color': 'red'}
             ],
-            'bar': {'color': 'darkblue'},
-            'threshold': {'line': {'color': 'red', 'width': 4}, 'value': risk_percent}
+            'threshold': {
+                'line': {'color': "red", 'width': 4},
+                'thickness': 0.75,
+                'value': value * 100
+            }
         }
     ))
-    fig.update_layout(height=300, margin=dict(l=20, r=20, t=50, b=20))
+    
+    fig.update_layout(
+        height=300,
+        margin=dict(l=20, r=20, t=50, b=20),
+    )
+    
     return fig
 
-# --------------------------
-# 📥 입력 필드 렌더링 함수
-# --------------------------
-def render_input_fields(form) -> dict:
-    fields = {
-        'CustomerID': form.text_input('고객 ID *', value=f"CUST-{np.random.randint(10000,99999)}"),
-        'Tenure': form.number_input('거래기간 (개월) *', min_value=0, value=12),
-        'SatisfactionScore': form.number_input('만족도 점수 (1-5) *', min_value=1, max_value=5, value=3),
-        'OrderCount': form.number_input('주문 횟수 *', min_value=0, value=10),
-        'HourSpendOnApp': form.number_input('앱 사용 시간 (시간) *', min_value=0.0, value=3.0),
-        'DaySinceLastOrder': form.number_input('마지막 주문 후 경과일 *', min_value=0, value=15),
-        'Gender': form.selectbox('성별', ['Male','Female']),
-        'Complain': form.selectbox('불만 제기 여부', ['아니오','예'])
+def show():
+    # 디버그: 함수 시작
+    st.write("DEBUG: 함수 시작")
+    
+    # 애니메이션 적용
+    add_page_transition()
+    
+    # 헤더 표시
+    show_header()
+    
+    # 디버그: 헤더 표시 후
+    st.write("DEBUG: 헤더 표시 완료")
+    
+    # 앱 시작
+    st.title("고객 이탈 예측")
+    st.write("고객 정보를 입력하여 이탈 가능성을 예측해보세요.")
+    
+    # 디버그: 제목 표시 후
+    st.write("DEBUG: 제목 및 설명 표시 완료")
+
+    # 입력 컬럼 정의 (+ CustomerID 추가, Churn 제외)
+    columns = [
+        'CustomerID',                  # 고객 ID (추가)
+        'Tenure',                      # 거래기간
+        'PreferredLoginDevice',        # 선호 로그인 기기
+        'CityTier',                    # 도시 등급
+        'WarehouseToHome',             # 창고에서 집까지 거리
+        'PreferredPaymentMode',        # 선호 결제 방식
+        'Gender',                      # 성별
+        'HourSpendOnApp',              # 앱 사용 시간
+        'NumberOfDeviceRegistered',    # 등록된 기기 수
+        'PreferedOrderCat',            # 선호 주문 카테고리
+        'SatisfactionScore',           # 만족도 점수
+        'MaritalStatus',               # 결혼 상태
+        'NumberOfAddress',             # 주소 개수
+        'Complain',                    # 불만 제기 여부
+        'OrderAmountHikeFromlastYear', # 작년 대비 주문 금액 증가율
+        'CouponUsed',                  # 쿠폰 사용 횟수
+        'OrderCount',                  # 주문 횟수
+        'DaySinceLastOrder',           # 마지막 주문 후 경과일
+        'CashbackAmount'               # 캐시백 금액
+    ]
+    
+    # 디버그: 컬럼 정의 후
+    st.write("DEBUG: 컬럼 정의 완료")
+
+    # 필수 입력 필드 지정 (나머지는 선택 사항)
+    required_columns = [
+        'CustomerID',              # 고객 ID (필수 추가)
+        'Tenure',                  # 거래기간
+        'SatisfactionScore',       # 만족도 점수
+        'OrderCount',              # 주문 횟수
+        'HourSpendOnApp',          # 앱 사용 시간
+        'DaySinceLastOrder'        # 마지막 주문 후 경과일
+    ]
+
+    # 컬럼별 한글 이름 매핑
+    column_korean_names = {
+        'CustomerID': '고객 ID',
+        'Tenure': '거래기간 (개월)',
+        'PreferredLoginDevice': '선호 로그인 기기',
+        'CityTier': '도시 등급',
+        'WarehouseToHome': '창고-집 거리 (km)',
+        'PreferredPaymentMode': '선호 결제 방식',
+        'Gender': '성별',
+        'HourSpendOnApp': '앱 사용 시간 (시간)',
+        'NumberOfDeviceRegistered': '등록된 기기 수',
+        'PreferedOrderCat': '선호 주문 카테고리',
+        'SatisfactionScore': '만족도 점수 (1-5)',
+        'MaritalStatus': '결혼 상태',
+        'NumberOfAddress': '주소 개수',
+        'Complain': '불만 제기 여부',
+        'OrderAmountHikeFromlastYear': '작년 대비 주문 금액 증가율 (%)',
+        'CouponUsed': '쿠폰 사용 횟수',
+        'OrderCount': '주문 횟수',
+        'DaySinceLastOrder': '마지막 주문 후 경과일',
+        'CashbackAmount': '캐시백 금액 (원)'
     }
-    return fields
 
-# ------------------------
-# 📊 결과 출력 렌더링 함수
-# ------------------------
-def render_results(input_data: dict, prob_value: float, predictor: ChurnPredictor):
-    st.subheader('예측 결과')
-    col1, col2 = st.columns(2)
+    # 타입과 선택지 매핑
+    column_types = {
+        'CustomerID': 'text',       # 고객 ID는 텍스트 타입
+        'Tenure': 'number',
+        'PreferredLoginDevice': 'select',
+        'CityTier': 'number',
+        'WarehouseToHome': 'number',
+        'PreferredPaymentMode': 'select',
+        'Gender': 'select',
+        'HourSpendOnApp': 'number',
+        'NumberOfDeviceRegistered': 'number',
+        'PreferedOrderCat': 'select',
+        'SatisfactionScore': 'number',
+        'MaritalStatus': 'select',
+        'NumberOfAddress': 'number',
+        'Complain': 'select',
+        'OrderAmountHikeFromlastYear': 'number',
+        'CouponUsed': 'number',
+        'OrderCount': 'number',
+        'DaySinceLastOrder': 'number',
+        'CashbackAmount': 'number'
+    }
 
-    with col1:
-        st.plotly_chart(create_churn_gauge(prob_value), use_container_width=True)
+    # 선택 항목 매핑
+    select_options = {
+        'PreferredLoginDevice': ['Mobile', 'Desktop', 'Tablet'],
+        'PreferredPaymentMode': ['Credit Card', 'Debit Card', 'UPI', 'Cash on Delivery'],
+        'Gender': ['Male', 'Female'],
+        'PreferedOrderCat': ['Electronics', 'Fashion', 'Grocery', 'Home'],
+        'MaritalStatus': ['Single', 'Married', 'Divorced'],
+        'Complain': ['예', '아니오']
+    }
+
+    # 기본값 매핑
+    default_values = {
+        'CustomerID': 'CUST-' + ''.join(['0' + str(np.random.randint(10000, 100000))]),  # 랜덤 고객 ID 
+        'Tenure': 12,
+        'PreferredLoginDevice': 'Mobile',
+        'CityTier': 1,
+        'WarehouseToHome': 20,
+        'PreferredPaymentMode': 'Credit Card',
+        'Gender': 'Male',
+        'HourSpendOnApp': 3.0,
+        'NumberOfDeviceRegistered': 2,
+        'PreferedOrderCat': 'Electronics',
+        'SatisfactionScore': 3,
+        'MaritalStatus': 'Single',
+        'NumberOfAddress': 2,
+        'Complain': '아니오',
+        'OrderAmountHikeFromlastYear': 15.0,
+        'CouponUsed': 3,
+        'OrderCount': 10,
+        'DaySinceLastOrder': 15,
+        'CashbackAmount': 150.0
+    }
+
+    # 필수 입력 필드 표시
+    st.markdown("""
+    <style>
+    .required-field::after {
+        content: " *";
+        color: red;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("**참고:** 빨간색 별표(\*) 표시가 있는 필드는 필수 입력 사항입니다.")
+    
+    # 디버그: 필수 필드 스타일 적용 후
+    st.write("DEBUG: 필수 필드 스타일 적용 완료")
+
+    # 입력값을 저장할 딕셔너리
+    input_data = {}
+
+    # 필수 입력 필드 검증용 변수
+    required_fields_filled = {col: False for col in required_columns}
+
+    # 필드 카테고리로 그룹화 (필수/선택)
+    required_fields = []
+    optional_fields = []
+
+    for col in columns:
+        if col in required_columns:
+            required_fields.append(col)
+        else:
+            optional_fields.append(col)
+
+    # 탭 생성
+    tab1, tab2 = st.tabs(["필수 입력 필드", "선택 입력 필드"])
+    
+    # 디버그: 탭 생성 후
+    st.write("DEBUG: 탭 생성 완료")
+
+    with tab1:
+        # 필수 입력 필드 그리드
+        st.markdown("### 필수 입력 필드")
+        
+        # 그리드 열 수 계산 (최대 3개 컬럼)
+        req_cols = 3
+        req_rows = (len(required_fields) + req_cols - 1) // req_cols
+        
+        for row in range(req_rows):
+            cols = st.columns(req_cols)
+            for col in range(req_cols):
+                idx = row * req_cols + col
+                
+                if idx < len(required_fields):
+                    column = required_fields[idx]
+                    korean_name = column_korean_names.get(column, column)
+                    # 필수 입력 표시 추가
+                    label = f"<div class='required-field'>{korean_name}</div>"
+                    col_type = column_types.get(column, 'text')
+                    
+                    with cols[col]:
+                        st.markdown(label, unsafe_allow_html=True)
+                        
+                        # 컬럼 타입에 따라 적절한 입력 위젯 생성
+                        if col_type == 'text':
+                            # 텍스트 타입 입력 (고객 ID 등)
+                            value = st.text_input(
+                                "",  # 레이블은 위에서 이미 표시
+                                value=default_values.get(column, ""),
+                                key=f"input_{column}"
+                            )
+                            input_data[column] = value
+                            if value and column in required_columns:
+                                required_fields_filled[column] = True
+                            
+                        elif col_type == 'number':
+                            # 숫자 타입 입력
+                            min_val = 0 if column in ['Tenure', 'CityTier', 'WarehouseToHome', 'HourSpendOnApp', 
+                                                   'NumberOfDeviceRegistered', 'SatisfactionScore', 'NumberOfAddress',
+                                                   'OrderAmountHikeFromlastYear', 'CouponUsed', 'OrderCount', 
+                                                   'DaySinceLastOrder', 'CashbackAmount'] else 0.0
+                            
+                            # 특별 범위 설정
+                            if column == 'SatisfactionScore':
+                                min_val, max_val = 1, 5
+                            else:
+                                max_val = None
+                            
+                            if column in ['HourSpendOnApp', 'OrderAmountHikeFromlastYear', 'CashbackAmount']:
+                                # 소수점이 필요한 경우
+                                value = st.number_input(
+                                    "",  # 레이블은 위에서 이미 표시
+                                    min_value=float(min_val) if min_val is not None else None,
+                                    max_value=float(max_val) if max_val is not None else None,
+                                    value=float(default_values.get(column, 0.0)),
+                                    step=0.1,
+                                    key=f"input_{column}"
+                                )
+                                input_data[column] = value
+                                if value > 0 or column not in required_columns:
+                                    required_fields_filled[column] = True
+                            else:
+                                # 정수 입력
+                                value = st.number_input(
+                                    "",  # 레이블은 위에서 이미 표시
+                                    min_value=int(min_val) if min_val is not None else None,
+                                    max_value=int(max_val) if max_val is not None else None,
+                                    value=int(default_values.get(column, 0)),
+                                    step=1,
+                                    key=f"input_{column}"
+                                )
+                                input_data[column] = value
+                                if value > 0 or column not in required_columns:
+                                    required_fields_filled[column] = True
+                        
+                        elif col_type == 'select':
+                            # 선택형 입력
+                            options = select_options.get(column, [])
+                            default_idx = options.index(default_values.get(column)) if default_values.get(column) in options else 0
+                            
+                            if column == 'Complain':
+                                # 예/아니오 선택의 경우 boolean으로 변환
+                                selected = st.selectbox(
+                                    "",  # 레이블은 위에서 이미 표시
+                                    options,
+                                    index=0 if default_values.get(column) == '아니오' else 1,
+                                    key=f"input_{column}"
+                                )
+                                input_data[column] = 1 if selected == '예' else 0
+                            else:
+                                input_data[column] = st.selectbox(
+                                    "",  # 레이블은 위에서 이미 표시
+                                    options,
+                                    index=default_idx,
+                                    key=f"input_{column}"
+                                )
+                            
+                            # 선택형 필드는 항상 값이 있으므로 필수 필드 충족 처리
+                            if column in required_columns:
+                                required_fields_filled[column] = True
+
+    with tab2:
+        # 선택 입력 필드 그리드
+        st.markdown("### 선택 입력 필드")
+        
+        # 그리드 열 수 계산 (최대 3개 컬럼)
+        opt_cols = 3
+        opt_rows = (len(optional_fields) + opt_cols - 1) // opt_cols
+        
+        for row in range(opt_rows):
+            cols = st.columns(opt_cols)
+            for col in range(opt_cols):
+                idx = row * opt_cols + col
+                
+                if idx < len(optional_fields):
+                    column = optional_fields[idx]
+                    korean_name = column_korean_names.get(column, column)
+                    col_type = column_types.get(column, 'text')
+                    
+                    with cols[col]:
+                        # 컬럼 타입에 따라 적절한 입력 위젯 생성
+                        if col_type == 'text':
+                            # 텍스트 타입 입력
+                            input_data[column] = st.text_input(
+                                korean_name,
+                                value=default_values.get(column, ""),
+                                key=f"input_{column}"
+                            )
+                        
+                        elif col_type == 'number':
+                            # 숫자 타입 입력
+                            min_val = 0 if column in ['Tenure', 'CityTier', 'WarehouseToHome', 'HourSpendOnApp', 
+                                                   'NumberOfDeviceRegistered', 'SatisfactionScore', 'NumberOfAddress',
+                                                   'OrderAmountHikeFromlastYear', 'CouponUsed', 'OrderCount', 
+                                                   'DaySinceLastOrder', 'CashbackAmount'] else 0.0
+                            
+                            # 특별 범위 설정
+                            if column == 'SatisfactionScore':
+                                min_val, max_val = 1, 5
+                            else:
+                                max_val = None
+                            
+                            if column in ['HourSpendOnApp', 'OrderAmountHikeFromlastYear', 'CashbackAmount']:
+                                # 소수점이 필요한 경우
+                                input_data[column] = st.number_input(
+                                    korean_name,
+                                    min_value=float(min_val) if min_val is not None else None,
+                                    max_value=float(max_val) if max_val is not None else None,
+                                    value=float(default_values.get(column, 0.0)),
+                                    step=0.1,
+                                    key=f"input_{column}"
+                                )
+                            else:
+                                # 정수 입력
+                                input_data[column] = st.number_input(
+                                    korean_name,
+                                    min_value=int(min_val) if min_val is not None else None,
+                                    max_value=int(max_val) if max_val is not None else None,
+                                    value=int(default_values.get(column, 0)),
+                                    step=1,
+                                    key=f"input_{column}"
+                                )
+                        
+                        elif col_type == 'select':
+                            # 선택형 입력
+                            options = select_options.get(column, [])
+                            default_idx = options.index(default_values.get(column)) if default_values.get(column) in options else 0
+                            
+                            if column == 'Complain':
+                                # 예/아니오 선택의 경우 boolean으로 변환
+                                selected = st.selectbox(
+                                    korean_name,
+                                    options,
+                                    index=0 if default_values.get(column) == '아니오' else 1,
+                                    key=f"input_{column}"
+                                )
+                                input_data[column] = 1 if selected == '예' else 0
+                            else:
+                                input_data[column] = st.selectbox(
+                                    korean_name,
+                                    options,
+                                    index=default_idx,
+                                    key=f"input_{column}"
+                                )
+
+    # 예측 버튼
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 1, 1])
 
     with col2:
-        if prob_value < 0.3:
-            risk_text, action = '낮음', '정기적인 마케팅 이메일을 보내세요.'
-        elif prob_value < 0.7:
-            risk_text, action = '중간', '개인화된 제안을 고려하세요.'
+        predict_button = st.button("이탈 예측하기", use_container_width=True, type="primary")
+        
+    # 디버그: 예측 버튼 생성 후
+    st.write("DEBUG: 예측 버튼 생성 완료")
+
+    # 예측 결과 표시
+    if predict_button:
+        # 디버그: 예측 버튼 클릭
+        st.write("DEBUG: 예측 버튼 클릭됨")
+        
+        # 필수 필드 검증
+        all_required_filled = all(required_fields_filled.values())
+        
+        if not all_required_filled:
+            # 필수 입력 필드 미입력 시 경고 표시
+            missing_fields = [column_korean_names.get(col, col) for col, filled in required_fields_filled.items() if not filled]
+            st.error(f"다음 필수 입력 항목을 입력해주세요: {', '.join(missing_fields)}")
+            # 디버그: 필수 필드 검증 실패
+            st.write("DEBUG: 필수 필드 검증 실패")
         else:
-            risk_text, action = '높음', '즉각적인 고객 혜택이 필요합니다.'
+            # 디버그: 필수 필드 검증 성공
+            st.write("DEBUG: 필수 필드 검증 성공, 예측 시작")
+            
+            # 로딩 표시
+            with st.spinner("예측 중..."):
+                try:
+                    # 입력 데이터를 DataFrame으로 변환
+                    input_df = pd.DataFrame([input_data])
+                    st.write("DEBUG: 입력 데이터 DataFrame 변환 완료")
+                    
+                    # 고객 ID 표시
+                    st.markdown(f"### 고객 ID: {input_data['CustomerID']}")
+                    
+                    # 디버그: ChurnPredictor 로드 시작
+                    st.write("DEBUG: ChurnPredictor 로드 시작")
+                    
+                    # 이탈 예측 모델 로드 및 예측
+                    predictor = ChurnPredictor()
+                    st.write("DEBUG: ChurnPredictor 인스턴스 생성 완료")
+                    
+                    _, y_proba = predictor.predict(input_df)
+                    st.write("DEBUG: 예측 완료")
+                    
+                    prob_value = y_proba[0]  # 이탈 확률
+                    st.write(f"DEBUG: 예측된 확률 값: {prob_value}")
 
-        st.markdown(f"""
-        - **이탈 확률**: {prob_value:.2%}  
-        - **위험도**: **{risk_text}**
+                    # 결과 표시
+                    st.markdown("---")
+                    st.subheader("예측 결과")
+                    
+                    col1, col2 = st.columns(2)
+                    st.write("DEBUG: 결과 표시 컬럼 생성 완료")
+                    
+                    with col1:
+                        st.write("DEBUG: 게이지 차트 생성 시작")
+                        # 이탈 확률 게이지
+                        st.plotly_chart(
+                            create_churn_gauge(prob_value),
+                            use_container_width=True
+                        )
+                        st.write("DEBUG: 게이지 차트 생성 완료")
+                    
+                    with col2:
+                        # 위험도 수준
+                        if prob_value < 0.3:
+                            risk_level = "low"
+                            risk_text = "낮음"
+                            risk_color = "#4CAF50"
+                            action_text = "정기적인 마케팅 이메일을 보내고 일반적인 고객 관리를 유지하세요."
+                        elif prob_value < 0.7:
+                            risk_level = "medium"
+                            risk_text = "중간"
+                            risk_color = "#FFC107"
+                            action_text = "특별 할인이나 개인화된 제안을 통해 참여도를 높이는 것이 좋습니다."
+                        else:
+                            risk_level = "high"
+                            risk_text = "높음"
+                            risk_color = "#F44336"
+                            action_text = "즉각적인 고객 응대와 특별 혜택 제공이 필요합니다."
+                        
+                        # 결과 요약
+                        st.markdown(f"""
+                        ### 예측 결과 요약
+                        - **이탈 확률**: {prob_value:.2%}
+                        - **위험도**: <span style='color:{risk_color};font-weight:bold'>{risk_text}</span>
+                        
+                        ### 권장 조치
+                        {action_text}
+                        """, unsafe_allow_html=True)
+                    
+                    # 주요 영향 요인
+                    st.subheader("주요 영향 요인")
+                    
+                    # 영향 요인 계산 (모델 기반)
+                    feature_importance = predictor.get_feature_importance()
+                    if feature_importance:
+                        # 특성 중요도를 리스트로 변환
+                        factors = [
+                            {"name": column_korean_names.get(feature, feature), 
+                             "value": importance, 
+                             "weight": 1.0,  # 이미 중요도에 가중치가 반영되어 있음
+                             "description": f"{column_korean_names.get(feature, feature)}이(가) 이탈 확률에 영향을 미칩니다."}
+                            for feature, importance in feature_importance.items()
+                        ]
+                        
+                        # 중요도로 정렬
+                        factors.sort(key=lambda x: x["value"], reverse=True)
+                        
+                        # 상위 3개 요인
+                        top_factors = factors[:3]
+                    else:
+                        # 모델에서 특성 중요도를 얻지 못한 경우: 입력값 기반 계산
+                        # 필요한 계수 다시 계산
+                        tenure_factor = 1 - min(input_data.get('Tenure', 0), 60) / 60
+                        app_factor = 1 - min(input_data.get('HourSpendOnApp', 0), 10) / 10
+                        satisfaction_factor = 1 - input_data.get('SatisfactionScore', 3) / 5
+                        order_factor = 1 - min(input_data.get('OrderCount', 0), 50) / 50
+                        dayslast_factor = min(input_data.get('DaySinceLastOrder', 0), 90) / 90
+                        
+                        factors = [
+                            {"name": "거래기간", "value": tenure_factor, "weight": 0.2, "description": "거래기간이 길수록 이탈 확률이 낮아집니다."},
+                            {"name": "앱 사용 시간", "value": app_factor, "weight": 0.2, "description": "앱 사용 시간이 길수록 이탈 확률이 낮아집니다."},
+                            {"name": "만족도 점수", "value": satisfaction_factor, "weight": 0.3, "description": "만족도가 높을수록 이탈 확률이 낮아집니다."},
+                            {"name": "주문 횟수", "value": order_factor, "weight": 0.1, "description": "주문 횟수가 많을수록 이탈 확률이 낮아집니다."},
+                            {"name": "마지막 주문 후 경과일", "value": dayslast_factor, "weight": 0.2, "description": "마지막 주문 이후 시간이 길수록 이탈 확률이 높아집니다."}
+                        ]
+                        factors.sort(key=lambda x: x["value"] * x["weight"], reverse=True)
+                        top_factors = factors[:3]
+                    
+                    # 요인별 가중 영향력 계산
+                    weighted_factors = [(f["name"], f["value"] * f["weight"], f["description"]) for f in top_factors]
+                    
+                    # 막대 그래프 데이터
+                    factor_df = pd.DataFrame({
+                        '요인': [f[0] for f in weighted_factors],
+                        '영향력': [f[1] for f in weighted_factors]
+                    })
+                    
+                    # 막대 그래프 표시
+                    st.bar_chart(factor_df, x='요인', y='영향력')
+                    
+                    # 요인별 설명
+                    for name, impact, desc in weighted_factors:
+                        st.markdown(f"**{name}**: {desc}")
+                    
+                except Exception as e:
+                    st.error(f"예측 중 오류가 발생했습니다: {str(e)}")
+                    # 디버그: 예측 중 오류 발생
+                    st.write(f"DEBUG: 예측 중 오류 발생 - {str(e)}")
+                    import traceback
+                    st.write("상세 오류:")
+                    st.code(traceback.format_exc())
 
-        **권장 조치**: {action}
-        """)
+    # 디버그: 함수 종료
+    st.write("DEBUG: 함수 종료")
 
-    st.subheader('주요 영향 요인')
-    fi = predictor.get_feature_importance()
-    if fi:
-        top_fi = sorted(fi.items(), key=lambda x: x[1], reverse=True)[:3]
-        df_fi = pd.DataFrame(top_fi, columns=['요인','영향도'])
-        st.bar_chart(df_fi.set_index('요인'))
-    else:
-        st.warning('특성 중요도를 불러올 수 없습니다.')
-
-# --------------------------
-# 🚀 Streamlit 메인 페이지
-# --------------------------
-def main():
-    add_page_transition()
-    show_header()
-    st.title('고객 이탈 예측')
-    st.write('고객 정보를 입력하고 제출 버튼을 눌러 예측하세요.')
-
-    predictor = get_predictor()
-    with st.form('predict_form') as form:
-        input_data = render_input_fields(form)
-        submitted = form.form_submit_button('예측하기')
-
-    if submitted:
-        try:
-            input_df = pd.DataFrame([input_data])
-            _, y_proba = predictor.predict(input_df)
-            render_results(input_data, y_proba[0], predictor)
-        except Exception as e:
-            st.error(f'예측 중 오류 발생: {e}')
-
-# --------------------------
-# 앱 실행
-# --------------------------
-if __name__ == '__main__':
-    main()
+# 메인 함수 호출이 필요하면 추가
+if __name__ == "__main__":
+    show() 
