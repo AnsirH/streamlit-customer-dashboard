@@ -542,7 +542,119 @@ def load_xgboost_model2():
         raise RuntimeError(f"[❌ 모델 로드 실패] {e}")
 
 
+####################################
 
+# 이탈탭 값 리소스 초기화 포함 코드
+class ChurnPredictor2:
+    """고객 이탈 예측을 위한 개선된 모델 클래스"""
+
+    def __init__(self, model_path=None, external_model=None):
+        """모델 로드 또는 외부 주입"""
+        self.model = external_model
+        self.model_path = model_path or (Path(__file__).parent / "xgb_best_model.pkl")
+        self.feature_importance_cache = None
+
+        if self.model is None:
+            try:
+                self.load_model()
+            except Exception as e:
+                logger.error(f"❌ 모델 로드 실패: {str(e)}")
+                st.error("❌ 모델 로드 실패")
+
+    def load_model(self):
+        """로컬 모델 파일 로드"""
+        if not self.model_path.exists():
+            logger.error(f"❌ 모델 파일 없음: {self.model_path}")
+            st.error(f"❌ 모델 파일이 존재하지 않습니다.\n{self.model_path}")
+            return False
+        try:
+            self.model = joblib.load(self.model_path)
+            logger.info(f"✅ 모델 로드 성공: {self.model_path}")
+            return True
+        except Exception as e:
+            logger.error(f"❌ 모델 로딩 중 오류: {str(e)}")
+            st.error(f"❌ 모델 로딩 중 오류\n{str(e)}")
+            return False
+
+    def predict(self, input_df: pd.DataFrame):
+        """예측 수행"""
+        if self.model is None:
+            self.load_model()
+        if self.model is None:
+            return self._default_prediction()
+
+        try:
+            processed_df = self._preprocess_data(input_df)
+            y_pred = self.model.predict(processed_df)
+            y_proba = self.model.predict_proba(processed_df)[:, 1]
+
+            if len(y_proba) == 0:
+                return self._default_prediction()
+
+            self.feature_importance_cache = None  # 중요도 초기화
+            self._compute_feature_importance(processed_df)
+
+            return y_pred, y_proba
+        except Exception as e:
+            logger.error(f"❌ 예측 오류: {str(e)}")
+            return self._default_prediction()
+
+    def _default_prediction(self):
+        """모델 실패 시 기본 반환"""
+        return np.array([0]), np.array([0.5])
+
+    def _preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """입력 전처리"""
+        df = df.copy()
+        for col in ['CustomerID', 'customer_id', 'cust_id', 'id']:
+            if col in df.columns:
+                df.drop(columns=[col], inplace=True)
+
+        if 'Complain' in df.columns and isinstance(df['Complain'].iloc[0], str):
+            df['Complain'] = df['Complain'].apply(lambda x: 1 if x == '예' else 0)
+
+        return df
+
+    def _compute_feature_importance(self, input_df: pd.DataFrame):
+        """SHAP 기반 특성 중요도 계산"""
+        try:
+            if self.model is None:
+                return self._default_feature_importance()
+
+            explainer = shap.TreeExplainer(self.model)
+            shap_values = explainer.shap_values(input_df)
+
+            if isinstance(shap_values, list):
+                shap_values = shap_values[1]  # 클래스 1 기준
+
+            importance = np.abs(shap_values).mean(axis=0)
+            self.feature_importance_cache = importance
+            return importance
+        except Exception as e:
+            logger.warning(f"⚠️ SHAP 계산 실패, 기본값 사용: {str(e)}")
+            if hasattr(self.model, 'feature_importances_'):
+                self.feature_importance_cache = self.model.feature_importances_
+                return self.feature_importance_cache
+            return self._default_feature_importance()
+
+    def _default_feature_importance(self):
+        """중요도 실패 시 기본값 반환"""
+        default_importance = np.array([0.25, 0.22, 0.18, 0.15, 0.12, 0.08])
+        self.feature_importance_cache = default_importance
+        return default_importance
+
+    def get_feature_importance(self):
+        """캐시된 중요도 반환"""
+        if self.feature_importance_cache is None:
+            return self._default_feature_importance()
+
+        if isinstance(self.feature_importance_cache, np.ndarray):
+            return {
+                f'feature_{i+1}': float(val)
+                for i, val in enumerate(self.feature_importance_cache)
+            }
+
+        return self.feature_importance_cache
 
 
 ########## 함수업데이트작업 ##########
