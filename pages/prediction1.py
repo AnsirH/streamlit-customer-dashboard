@@ -14,113 +14,48 @@ MODEL_PATH = Path(os.path.dirname(__file__)) / ".." / "models" / "xgboost_best_m
 
 # 모델과 전처리 클래스 정의
 class ChurnPredictor:
-    """고객 이탈 예측을 위한 모델 클래스"""
-    
-    def __init__(self, model_path=None):
-        """모델을 로드하고 초기화합니다."""
+    def init(self, model_path):
         self.model = None
-        if model_path is None:
-            self.model_path = MODEL_PATH
-        else:
-            self.model_path = model_path
+        self.model_path = model_path
         self.feature_importance_cache = None
         self.load_model()
-        
+
     def load_model(self):
-        """모델 파일을 로드합니다."""
-        try:
-            if not self.model_path.exists():
-                st.error(f"모델 파일을 찾을 수 없습니다: {self.model_path}")
-                return False
-            
-            self.model = joblib.load(self.model_path)
-            st.success(f"✅ 모델 로드 성공: {self.model_path.name}")
-            return True
-        except Exception as e:
-            st.error(f"모델 로드 실패: {str(e)}")
-            import traceback
-            st.code(traceback.format_exc())
-            return False
-    
+        import joblib
+        self.model = joblib.load(self.model_path)
+
     def predict(self, input_df):
-        """입력 데이터에 대한 이탈 예측을 수행합니다."""
+        if self.model is None:
+            return np.array([0]), np.array([0.5])
+
+        processed_df = self._preprocess_data(input_df)
+
         try:
-            # 모델이 없으면 로드 시도
-            if self.model is None:
-                if not self.load_model():
-                    st.error("⚠️ 모델 로드 실패! 기본값 반환")
-                    return np.array([0]), np.array([0.5])  # 기본값 반환
-            
-            # 디버그: 모델의 특성 이름 확인
-            with st.expander("디버그: 모델 정보"):
-                st.write("### 모델 정보")
-                st.write("모델 파일 경로:", self.model_path)
-                st.write("모델 타입:", type(self.model).__name__)
-                
-                if hasattr(self.model, 'feature_names_in_'):
-                    st.write("### 모델 특성 정보")
-                    st.write("모델 특성 수:", len(self.model.feature_names_in_))
-                    
-                    # 원핫인코딩된 특성 확인
-                    encoded_features = {}
-                    normal_features = []
-                    for feature in self.model.feature_names_in_:
-                        if '_' in feature:
-                            prefix = feature.split('_')[0]
-                            if prefix not in encoded_features:
-                                encoded_features[prefix] = []
-                            encoded_features[prefix].append(feature)
-                        else:
-                            normal_features.append(feature)
-                    
-                    st.write("### 원핫인코딩된 특성 그룹")
-                    for prefix, features in encoded_features.items():
-                        # expander를 내부에서 사용하지 않고 섹션으로 변경
-                        st.write(f"**{prefix}** ({len(features)}개)")
-                        st.write(sorted(features))
-                        st.markdown("---")
-                    
-                    st.write("### 일반 특성 목록")
-                    st.write(sorted(normal_features))
-            
-            # 데이터 전처리
-            processed_df = self._preprocess_data(input_df)
-            
-            # 예측 수행
-            try:
-                # 예측 및 확률 계산
-                y_pred = self.model.predict(processed_df)
-                y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
-                
-                # 디버그: 원시 예측값 출력
-                with st.expander("디버그: 원시 예측값"):
-                    st.write("예측 클래스:", y_pred)
-                    st.write("예측 확률 (원시값):", y_proba)
-                    # 예측값이 너무 낮은 경우 경고
-                    if y_proba[0] < 0.05:
-                        st.warning("⚠️ 예측된 이탈 확률이 매우 낮습니다. 이는 다음과 같은 이유로 발생할 수 있습니다:")
-                        st.write("1. 입력된 고객 데이터가 실제로 이탈 위험이 낮은 경우")
-                        st.write("2. 모델이 대부분의 케이스를 낮은 확률로 예측하도록 학습된 경우")
-                        st.write("3. 데이터 전처리 과정에서 원핫인코딩 등의 문제가 있는 경우")
-                        
-                        # 위험도 높은 구성으로 변경 제안
-                        st.info("테스트를 위해 '낮은 만족도(1)', '적은 주문 횟수(1)', '오래된 마지막 주문(90일+)' 등의 조합으로 시도해보세요.")
-                
-                # 특성 중요도 계산
-                self._compute_feature_importance(processed_df)
-                
-                return y_pred, y_proba
-            except Exception as e:
-                st.error(f"예측 오류: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
-                return np.array([0]), np.array([0.5])  # 기본값 반환
-                
+            y_proba = self.model.predict_proba(processed_df)[:, 1]
+            # ✅ 커스텀 threshold 적용
+            threshold = 0.3
+            y_pred = (y_proba >= threshold).astype(int)
+            return y_pred, y_proba
         except Exception as e:
-            st.error(f"전체 예측 과정 오류: {str(e)}")
-            import traceback
-            st.code(traceback.format_exc())
-            return np.array([0]), np.array([0.5])  # 기본값 반환
+            st.error(f"예측 오류: {str(e)}")
+            return np.array([0]), np.array([0.5])
+
+    def _preprocess_data(self, input_df):
+        df = input_df.copy()
+
+        # 누락 컬럼은 0으로 채우기
+        if hasattr(self.model, 'feature_namesin'):
+            expected_columns = list(self.model.feature_namesin)
+            for col in expected_columns:
+                if col not in df.columns:
+                    df[col] = 0
+            df = df[expected_columns]
+        return df
+
+    def get_feature_importance(self):
+        if hasattr(self.model, 'featureimportances'):
+            return dict(zip(self.model.feature_namesin, self.model.featureimportances))
+        return {})  # 기본값 반환
     
     def _preprocess_data(self, input_df):
         """입력 데이터를 전처리합니다. (19개 컬럼 -> 28개 컬럼)"""
