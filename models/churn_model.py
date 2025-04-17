@@ -220,7 +220,21 @@ class ChurnPredictor:
                 if prefix in data.columns:
                     # 10.1 입력 데이터에서 해당 컬럼 값 가져오기
                     for idx, row in data.iterrows():
-                        input_value = str(row[prefix]).strip()
+                        # None 값 확인 및 처리
+                        input_value = row[prefix]
+                        if input_value is None:
+                            st.warning(f"⚠️ '{prefix}'의 값이 None입니다. 빈 문자열로 처리합니다.")
+                            input_value = ""
+                        
+                        # 문자열로 변환하고 공백 제거
+                        input_value = str(input_value).strip()
+                        
+                        # 'Complain' 컬럼 처리 (예/아니오 -> 1/0)
+                        if prefix == 'Complain' or prefix == 'complaint_status':
+                            if input_value.lower() in ['예', 'yes', 'y', 'true', '1']:
+                                input_value = '1'
+                            else:
+                                input_value = '0'
                         
                         # 10.2 해당 값에 대한 원핫인코딩 컬럼 이름 생성
                         expected_col = f"{prefix}_{input_value}"
@@ -241,7 +255,12 @@ class ChurnPredictor:
             for feature in model_features:
                 # 원핫인코딩된 특성이 아닌 경우만 처리 (이미 위에서 처리되지 않은 경우)
                 if '_' not in feature and feature in data.columns:
-                    result_df[feature] = data[feature]
+                    # None 값 확인 및 처리
+                    if data[feature].isnull().any():
+                        st.warning(f"⚠️ '{feature}'에 None 값이 있습니다. 0으로 대체합니다.")
+                        result_df[feature] = data[feature].fillna(0)
+                    else:
+                        result_df[feature] = data[feature]
             
             # 12. 디버깅: 무시된 특성 정보 출력
             if ignored_features:
@@ -279,6 +298,8 @@ class ChurnPredictor:
                     if prefix in data.columns:
                         # 현재 값 확인
                         input_value = data[prefix].iloc[0]
+                        if input_value is None:
+                            input_value = ""
                         
                         # 이 범주형 변수에 해당하는 모든 원핫인코딩 컬럼
                         ohe_cols = [col for col in result_df.columns if col.startswith(f"{prefix}_")]
@@ -301,6 +322,21 @@ class ChurnPredictor:
             
             # 16. 전처리 완료
             st.write(f"🔍 [전처리]: 데이터 처리 완료, 최종 크기: {result_df.shape}")
+            
+            # 17. NaN 값 확인 및 처리
+            if result_df.isnull().values.any():
+                st.warning("⚠️ 최종 데이터에 NaN 값이 있습니다. 0으로 대체합니다.")
+                result_df = result_df.fillna(0)
+                
+            # 18. 데이터 타입 확인 및 처리
+            for col in result_df.columns:
+                if result_df[col].dtype == 'object':
+                    st.warning(f"⚠️ '{col}' 컬럼이 object 타입입니다. 숫자로 변환합니다.")
+                    try:
+                        result_df[col] = pd.to_numeric(result_df[col], errors='coerce').fillna(0)
+                    except Exception as e:
+                        st.error(f"⚠️ '{col}' 컬럼 변환 실패: {str(e)}")
+                        result_df[col] = 0
             
             return result_df
             
