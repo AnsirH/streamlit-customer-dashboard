@@ -215,16 +215,38 @@ class ChurnPredictor:
 # ===============================
 MODEL_PATH = Path(__file__).parent / "xgb_best_model.pkl"
 
-def load_churn_model(model_path=MODEL_PATH):
+def load_churn_model(model_path: str = None):
+    """
+    Load the trained churn prediction model.
+    
+    Args:
+        model_path: Path to the model file. Default is models/xgb_best_model.pkl
+        
+    Returns:
+        Trained model
+    """
+    if model_path is None:
+        model_path = Path(__file__).parent / "xgb_best_model.pkl"
+    else:
+        model_path = Path(model_path)
+        
     if not model_path.exists():
-        raise FileNotFoundError(f"\u274c 모델 파일을 찾을 수 없습니다: {model_path}")
-    model = joblib.load(model_path)
-    return model
+        raise FileNotFoundError(f"Model file not found: {model_path}")
+        
+    return joblib.load(model_path)
 
-def predict_churn(model, input_df: pd.DataFrame):
-    y_pred = model.predict(input_df)
-    y_proba = model.predict_proba(input_df)[:, 1]  # 이탈 확률
-    return y_pred, y_proba
+def predict_churn(model, input_df: pd.DataFrame) -> np.ndarray:
+    """
+    Predict churn probabilities for input data.
+    
+    Args:
+        model: Trained model
+        input_df: Input DataFrame for prediction
+        
+    Returns:
+        np.ndarray: Churn probabilities
+    """
+    return model.predict_proba(input_df)[:, 1]  # Return churn probabilities
 
 # ===============================
 # 토큰 시각화 함수

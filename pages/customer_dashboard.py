@@ -1,0 +1,179 @@
+import streamlit as st
+import pandas as pd
+from utils.visualizer import Visualizer
+from models.customer_analyzer import analyze_customers
+
+def show_customer_churn_analysis():
+    """
+    고객 이탈 예측 결과를 표시합니다.
+    - 고객 ID
+    - 이탈률
+    - 이탈 예측에 영향을 많이 끼친 상위 3개 컬럼
+    """
+    try:
+        # 데이터 분석 실행
+        result_df = analyze_customers()
+        
+        # 결과 표시
+        st.subheader("고객 이탈 예측 결과")
+        
+        # 컬럼명 변경
+        display_df = result_df[['CustomerID', 'Churn Risk', 
+                              'Top Feature 1', 'Importance 1',
+                              'Top Feature 2', 'Importance 2',
+                              'Top Feature 3', 'Importance 3']].copy()
+        
+        # 컬럼명 변경
+        display_df.columns = ['고객 ID', '이탈 위험도',
+                            '영향 요인 1', '중요도 1',
+                            '영향 요인 2', '중요도 2',
+                            '영향 요인 3', '중요도 3']
+        
+        # 이탈 위험도와 중요도를 퍼센트로 변환
+        display_df['이탈 위험도'] = display_df['이탈 위험도'].apply(lambda x: f"{x:.1%}")
+        display_df['중요도 1'] = display_df['중요도 1'].apply(lambda x: f"{x:.1%}")
+        display_df['중요도 2'] = display_df['중요도 2'].apply(lambda x: f"{x:.1%}")
+        display_df['중요도 3'] = display_df['중요도 3'].apply(lambda x: f"{x:.1%}")
+        
+        # 테이블 스타일 설정
+        st.dataframe(
+            display_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "고객 ID": st.column_config.TextColumn("고객 ID", width="medium"),
+                "이탈 위험도": st.column_config.TextColumn("이탈 위험도", width="small"),
+                "영향 요인 1": st.column_config.TextColumn("영향 요인 1", width="medium"),
+                "중요도 1": st.column_config.TextColumn("중요도 1", width="small"),
+                "영향 요인 2": st.column_config.TextColumn("영향 요인 2", width="medium"),
+                "중요도 2": st.column_config.TextColumn("중요도 2", width="small"),
+                "영향 요인 3": st.column_config.TextColumn("영향 요인 3", width="medium"),
+                "중요도 3": st.column_config.TextColumn("중요도 3", width="small")
+            }
+        )
+        
+    except Exception as e:
+        st.error(f"데이터 분석 중 오류가 발생했습니다: {str(e)}")
+
+def display_customer_info(customer_data):
+    """
+    고객의 기본 정보를 표시합니다.
+    
+    Args:
+        customer_data (pd.Series): 고객 정보를 포함하는 Series
+    """
+    # 고객 번호 표시
+    st.markdown(f"### 고객번호: {customer_data['CustomerID']}")
+    
+    # 고객 기본 정보
+    st.markdown("##### 고객 기본 정보")
+    info_data = {
+        '거래기간': f"{customer_data['Tenure']}개월",
+        '선호 로그인 기기': customer_data['PreferredLoginDevice'],
+        '도시 등급': f"Tier {customer_data['CityTier']}",
+        '성별': customer_data['Gender']
+    }
+    st.write(pd.Series(info_data))
+
+def display_order_info(customer_data):
+    """
+    고객의 주문 정보를 표시합니다.
+    
+    Args:
+        customer_data (pd.Series): 고객 정보를 포함하는 Series
+    """
+    st.markdown("##### 주문 정보")
+    order_data = {
+        '주문 횟수': customer_data['OrderCount'],
+        '마지막 주문': f"{customer_data['DaySinceLastOrder']}일 전",
+        '주문 증가율': f"{customer_data['OrderAmountHikeFromlastYear']}%",
+        '캐쉬백': f"${customer_data['CashbackAmount']:.2f}"
+    }
+    st.write(pd.Series(order_data))
+
+def display_satisfaction_info(customer_data):
+    """
+    고객의 만족도 정보를 표시합니다.
+    
+    Args:
+        customer_data (pd.Series): 고객 정보를 포함하는 Series
+    """
+    st.markdown("##### 만족도 정보")
+    satisfaction_data = {
+        '만족도': f"{customer_data['SatisfactionScore']}/5",
+        '불만 제기': '있음' if customer_data['Complain'] else '없음',
+        '앱 사용': f"{customer_data['HourSpendOnApp']}시간"
+    }
+    st.write(pd.Series(satisfaction_data))
+
+def display_churn_analysis(customer_data):
+    """
+    고객의 이탈 위험도와 관련 정보를 표시합니다.
+    
+    Args:
+        customer_data (pd.Series): 고객 정보를 포함하는 Series
+    """
+    st.markdown("#### 이탈 확률")
+    st.markdown('70% 이상의 이탈 확률을 가진 고객은 이탈 위험이 높습니다.')
+    st.plotly_chart(
+        Visualizer.create_churn_gauge(customer_data['churn_probability']),
+        use_container_width=True
+    )
+
+def display_churn_factors(customer_data):
+    """
+    고객의 주요 이탈 요인을 표시합니다.
+    
+    Args:
+        customer_data (pd.Series): 고객 정보를 포함하는 Series
+    """
+    st.markdown("##### 주요 이탈 요인")
+    st.markdown(f"""
+    <div style='background-color: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 10px; margin-top: 10px; margin-bottom: 20px;'>
+        <p style='color: white; font-size: 15px; margin: 0;'>
+            마지막 주문 후 일수: {customer_data['DaySinceLastOrder']}일
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def display_improvement_suggestions():
+    """
+    이탈 위험을 줄이기 위한 개선 방안을 표시합니다.
+    """
+    st.markdown("##### 개선 방안")
+    st.markdown("""
+    <div style='background-color: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 10px; margin-top: 10px;'>
+        <ul style='color: white; font-size: 13px; margin: 0; padding-left: 20px;'>
+            <li>개인화된 할인 쿠폰 발송</li>
+            <li>관심 상품 재입고 알림 서비스</li>
+            <li>최근 트렌드 상품 추천</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
+def show_customer_dashboard(customer_data):
+    """
+    고객 대시보드를 표시합니다.
+    
+    Args:
+        customer_data (pd.Series): 고객 정보를 포함하는 Series
+    """
+    # 메인 컨테이너
+    main_container = st.container()
+    
+    # 레이아웃 설정 - 4:6 비율
+    with main_container:
+        left_col, right_col = st.columns([4, 6])
+        
+        # 왼쪽 열에 고객 정보 표시
+        with left_col:
+            display_customer_info(customer_data)
+            display_order_info(customer_data)
+            display_satisfaction_info(customer_data)
+        
+        # 오른쪽 열에 이탈 분석 정보 표시
+        with right_col:
+            display_churn_analysis(customer_data)
+            display_churn_factors(customer_data)
+            display_improvement_suggestions()
+
