@@ -103,13 +103,30 @@ class ChurnPredictor:
         if 'complain' in df.columns and isinstance(df['complain'].iloc[0], str):
             df['complain'] = df['complain'].apply(lambda x: 1 if x == '예' else 0)
         
-        # 원핫인코딩이 필요한 범주형 특성들
+        # 컬럼명 매핑 (E Commerce Dataset2.xlsx와 일치시키기 위함)
+        column_mapping = {
+            'hour_spend_on_app': 'hourspendonapp',
+            'number_of_device_registered': 'numberofdeviceregistered',
+            'preferred_login_device': 'preferredlogindevice',
+            'preferred_payment_method': 'preferredpaymentmode',
+            'preferred_order_category': 'preferedordercat',
+            'order_amount_hike': 'orderamounthikefromlastyear',
+            'days_since_last_order': 'daysincelastorder',
+            'number_of_address': 'numberofaddress'
+        }
+        
+        # 컬럼명 변경
+        for old_col, new_col in column_mapping.items():
+            if old_col in df.columns:
+                df = df.rename(columns={old_col: new_col})
+        
+        # 원핫인코딩이 필요한 범주형 특성들 매핑
         categorical_features = {
-            'preferred_login_device': ['mobile', 'computer'],
+            'preferredlogindevice': ['mobile', 'computer'],
             'gender': ['male', 'female'],
-            'preferred_payment_method': ['credit card', 'debit card', 'upi', 'cash on delivery'],
-            'preferred_order_category': ['fashion', 'grocery', 'electronics', 'others'],
-            'marital_status': ['single', 'married', 'divorced']
+            'preferredpaymentmode': ['credit card', 'debit card', 'upi', 'cash on delivery'],
+            'preferedordercat': ['fashion', 'grocery', 'electronics', 'others'],
+            'maritalstatus': ['single', 'married', 'divorced']
         }
         
         # 원핫인코딩 수행
@@ -130,15 +147,21 @@ class ChurnPredictor:
         if hasattr(self.model, 'feature_names_in_'):
             expected_columns = [col.lower() for col in self.model.feature_names_in_]
             
+            # 디버그 출력
+            st.write("모델이 기대하는 컬럼:", sorted(expected_columns))
+            st.write("전처리 후 데이터프레임 컬럼:", sorted(df.columns.tolist()))
+            
             # 누락된 컬럼 추가
             for col in expected_columns:
                 if col not in df.columns:
                     df[col] = 0
+                    st.write(f"누락된 컬럼 추가: {col}")
             
             # 불필요한 컬럼 제거
             for col in list(df.columns):
                 if col not in expected_columns:
                     df = df.drop(col, axis=1)
+                    st.write(f"불필요한 컬럼 제거: {col}")
             
             # 컬럼 순서 맞추기
             df = df[expected_columns]
@@ -237,6 +260,15 @@ def show():
     
     # 입력값을 저장할 딕셔너리
     input_data = {}
+    
+    # 원핫인코딩이 필요한 범주형 특성들
+    categorical_features = {
+        'preferred_login_device': ['mobile', 'computer'],
+        'gender': ['male', 'female'],
+        'preferred_payment_method': ['credit card', 'debit card', 'upi', 'cash on delivery'],
+        'preferred_order_category': ['fashion', 'grocery', 'electronics', 'others'],
+        'marital_status': ['single', 'married', 'divorced']
+    }
     
     # 선택지가 있는 범주형 변수
     category_options = {
