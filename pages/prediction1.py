@@ -75,8 +75,10 @@ class ChurnPredictor:
                     
                     st.write("### 원핫인코딩된 특성 그룹")
                     for prefix, features in encoded_features.items():
-                        with st.expander(f"{prefix} ({len(features)}개)"):
-                            st.write(sorted(features))
+                        # expander를 내부에서 사용하지 않고 섹션으로 변경
+                        st.write(f"**{prefix}** ({len(features)}개)")
+                        st.write(sorted(features))
+                        st.markdown("---")
                     
                     st.write("### 일반 특성 목록")
                     st.write(sorted(normal_features))
