@@ -48,6 +48,12 @@ class ChurnPredictor:
                 if not self.load_model():
                     return np.array([0]), np.array([0.5])  # 기본값 반환
             
+            # 디버그: 모델의 특성 이름 확인
+            st.write("### 원본 모델 특성명 (전처리 전)")
+            if hasattr(self.model, 'feature_names_in_'):
+                st.write("모델 특성 수:", len(self.model.feature_names_in_))
+                st.write("모델 특성명:", sorted(self.model.feature_names_in_))
+            
             # 데이터 전처리
             processed_df = self._preprocess_data(input_df)
             
@@ -55,18 +61,29 @@ class ChurnPredictor:
             with st.expander("디버그: 전처리된 데이터"):
                 st.dataframe(processed_df)
                 if hasattr(self.model, 'feature_names_in_'):
-                    st.write("모델의 특성:", self.model.feature_names_in_)
-                    st.write(f"모델 특성 수: {len(self.model.feature_names_in_)}")
-                    st.write(f"입력 특성 수: {len(processed_df.columns)}")
+                    expected_cols = set(self.model.feature_names_in_)
+                    actual_cols = set(processed_df.columns)
                     
                     # 특성 매칭 확인
-                    missing = set(self.model.feature_names_in_) - set(processed_df.columns)
-                    extra = set(processed_df.columns) - set(self.model.feature_names_in_)
+                    st.write("### 컬럼명 일치 검사")
+                    st.write(f"모델 특성 수: {len(expected_cols)}")
+                    st.write(f"입력 특성 수: {len(actual_cols)}")
+                    
+                    missing = expected_cols - actual_cols
+                    extra = actual_cols - expected_cols
                     
                     if missing:
-                        st.error(f"누락된 특성: {missing}")
+                        st.error(f"⚠️ 누락된 특성: {missing}")
+                    else:
+                        st.success("✅ 모든 필요 특성이 존재합니다.")
+                        
                     if extra:
-                        st.warning(f"추가 특성: {extra}")
+                        st.warning(f"⚠️ 추가 특성: {extra}")
+                    else:
+                        st.success("✅ 불필요한 특성이 없습니다.")
+                        
+                    if not missing and not extra:
+                        st.success("✅ 모델과 입력 특성이 완벽히 일치합니다!")
             
             try:
                 # 예측 및 확률 계산
@@ -90,18 +107,24 @@ class ChurnPredictor:
         # 입력 데이터 복사
         df = input_df.copy()
         
+        st.write("### 전처리 시작")
+        st.write("원본 입력 컬럼:", sorted(df.columns.tolist()))
+        
         # 컬럼명을 모두 소문자로 변경
         df.columns = [col.lower() for col in df.columns]
+        st.write("소문자 변환 후 컬럼:", sorted(df.columns.tolist()))
         
         # CustomerID 제거 (예측에 사용되지 않음)
         columns_to_remove = ['customerid', 'customer_id', 'cust_id', 'id']
         for col in columns_to_remove:
             if col in df.columns:
                 df = df.drop(col, axis=1)
+                st.write(f"컬럼 제거: {col}")
         
         # Boolean 타입 변환
         if 'complain' in df.columns and isinstance(df['complain'].iloc[0], str):
             df['complain'] = df['complain'].apply(lambda x: 1 if x == '예' else 0)
+            st.write("'complain' 컬럼 변환: 예/아니오 -> 1/0")
         
         # 컬럼명 매핑 (E Commerce Dataset2.xlsx와 일치시키기 위함)
         column_mapping = {
@@ -112,13 +135,29 @@ class ChurnPredictor:
             'preferred_order_category': 'preferedordercat',
             'order_amount_hike': 'orderamounthikefromlastyear',
             'days_since_last_order': 'daysincelastorder',
-            'number_of_address': 'numberofaddress'
+            'number_of_address': 'numberofaddress',
+            'marital_status': 'maritalstatus',
+            'satisfaction_score': 'satisfactionscore',
+            'warehouse_to_home': 'warehousetohome',
+            'coupon_used': 'couponused',
+            'order_count': 'ordercount',
+            'cashback_amount': 'cashbackamount',
+            'city_tier': 'citytier'
         }
         
-        # 컬럼명 변경
+        # 컬럼명 변경 및 변경 로그 작성
+        rename_log = []
         for old_col, new_col in column_mapping.items():
             if old_col in df.columns:
                 df = df.rename(columns={old_col: new_col})
+                rename_log.append(f"{old_col} -> {new_col}")
+        
+        if rename_log:
+            st.write("### 컬럼명 매핑")
+            for log in rename_log:
+                st.write(log)
+        
+        st.write("매핑 후 컬럼:", sorted(df.columns.tolist()))
         
         # 원핫인코딩이 필요한 범주형 특성들 매핑
         categorical_features = {
@@ -129,11 +168,13 @@ class ChurnPredictor:
             'maritalstatus': ['single', 'married', 'divorced']
         }
         
-        # 원핫인코딩 수행
+        # 원핫인코딩 수행 및 로그 작성
+        onehot_log = []
         for feature, categories in categorical_features.items():
             if feature in df.columns:
                 # 현재 값 (소문자로 변환)
                 current_value = str(df[feature].iloc[0]).lower()
+                onehot_log.append(f"{feature}: '{current_value}'")
                 
                 # 원본 컬럼 제거
                 df = df.drop(feature, axis=1)
@@ -142,29 +183,50 @@ class ChurnPredictor:
                 for category in categories:
                     col_name = f"{feature}_{category}"
                     df[col_name] = 1 if current_value == category else 0
+                    onehot_log.append(f"  - {col_name}: {1 if current_value == category else 0}")
+        
+        if onehot_log:
+            st.write("### 원핫인코딩 변환")
+            for log in onehot_log:
+                st.write(log)
+        
+        st.write("원핫인코딩 후 컬럼:", sorted(df.columns.tolist()))
         
         # 모델에 필요한 컬럼 확인 및 조정
         if hasattr(self.model, 'feature_names_in_'):
             expected_columns = [col.lower() for col in self.model.feature_names_in_]
             
-            # 디버그 출력
-            st.write("모델이 기대하는 컬럼:", sorted(expected_columns))
-            st.write("전처리 후 데이터프레임 컬럼:", sorted(df.columns.tolist()))
+            st.write("### 모델이 기대하는 컬럼 vs 현재 컬럼")
+            st.write("모델 기대 컬럼 수:", len(expected_columns))
+            st.write("현재 컬럼 수:", len(df.columns))
             
             # 누락된 컬럼 추가
+            missing_cols = []
             for col in expected_columns:
                 if col not in df.columns:
                     df[col] = 0
-                    st.write(f"누락된 컬럼 추가: {col}")
+                    missing_cols.append(col)
+            
+            if missing_cols:
+                st.write("### 누락된 컬럼(0으로 추가)")
+                for col in missing_cols:
+                    st.write(f"- {col}")
             
             # 불필요한 컬럼 제거
+            extra_cols = []
             for col in list(df.columns):
                 if col not in expected_columns:
                     df = df.drop(col, axis=1)
-                    st.write(f"불필요한 컬럼 제거: {col}")
+                    extra_cols.append(col)
+            
+            if extra_cols:
+                st.write("### 제거된 컬럼")
+                for col in extra_cols:
+                    st.write(f"- {col}")
             
             # 컬럼 순서 맞추기
             df = df[expected_columns]
+            st.write("최종 컬럼 수:", len(df.columns))
         
         return df
     
