@@ -111,47 +111,16 @@ class ChurnPredictor:
         # 입력 데이터 복사
         df = input_df.copy()
         
-        # 컬럼 이름 매핑 (snake_case -> camelCase)
-        column_mapping = {
-            'tenure': 'Tenure',
-            'preferred_login_device': 'PreferredLoginDevice',
-            'city_tier': 'CityTier',
-            'warehouse_to_home': 'WarehouseToHome',
-            'preferred_payment_method': 'PreferredPaymentMode',  # 이름 변경
-            'gender': 'Gender',
-            'app_usage': 'HourSpendOnApp',  # 이름 변경
-            'registered_devices': 'NumberOfDeviceRegistered',  # 이름 변경
-            'preferred_order_category': 'PreferedOrderCat',  # 이름 변경
-            'satisfaction_score': 'SatisfactionScore',
-            'marital_status': 'MaritalStatus',
-            'address_count': 'NumberOfAddress',  # 이름 변경
-            'complaint_status': 'Complain',  # 이름 변경, boolean으로 변환 필요
-            'order_amount_diff': 'OrderAmountHikeFromlastYear',  # 이름 변경
-            'coupon_used': 'CouponUsed',
-            'num_orders': 'OrderCount',  # 이름 변경
-            'last_order_days': 'DaySinceLastOrder',  # 이름 변경
-            'cashback_amount': 'CashbackAmount'
-        }
-        
-        # 컬럼 이름 변환
-        renamed_columns = {}
-        for col in df.columns:
-            if col in column_mapping:
-                renamed_columns[col] = column_mapping[col]
-        
-        if renamed_columns:
-            df = df.rename(columns=renamed_columns)
-            
         # CustomerID 제거 (예측에 사용되지 않음)
         columns_to_remove = ['CustomerID', 'customer_id', 'cust_id', 'id']
         for col in columns_to_remove:
             if col in df.columns:
                 df = df.drop(col, axis=1)
         
-        # complaint_status/Complain 불리언 변환 (예/아니오 -> 0/1)
+        # Complain 불리언 변환 (예/아니오 -> 0/1)
         if 'Complain' in df.columns and isinstance(df['Complain'].iloc[0], str):
             df['Complain'] = df['Complain'].apply(lambda x: 1 if x == '예' else 0)
-            
+        
         return df
     
     def _compute_feature_importance(self, input_data):
