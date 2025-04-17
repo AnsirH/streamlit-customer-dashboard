@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 from components.header import show_header
 from components.animations import add_page_transition
+from utils.visualizer import Visualizer
+from utils.data_generator import generate_sample_data
 
 def show():
     # 애니메이션 적용
@@ -10,44 +11,69 @@ def show():
 
     show_header()
 
-    st.subheader("선택한 고객 ID: **a500**")
-
-    data = {
-        "고객 ID": ["a500"],
-        "위험률(%)": [70],
-        "칼럼1": [12],
-        "칼럼2": [1111],
-        "칼럼3": [45],
-        "칼럼4": ["aa"],
-        "칼럼5": ["xx"],
-        "칼럼6": [2.14],
-        "칼럼7": [1],
-        "칼럼8": [0],
-        "칼럼9": ["ff"],
-        "칼럼10": [1],
-        "칼럼11": [1],
-        "칼럼12": [1]
-    }
-    df = pd.DataFrame(data)
-    st.dataframe(df.T, use_container_width=True)
-
-    fig = go.Figure(go.Indicator(
-        mode = "gauge+number",
-        value = 70,
-        domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': "이탈확률"},
-        gauge = {
-            'axis': {'range': [0, 100]},
-            'bar': {'color': "orange"},
-            'shape': "angular"
+    # 임시 데이터 생성
+    df = generate_sample_data()
+    
+    # 고객 선택
+    customer_id = st.selectbox(
+        "고객 ID 선택",
+        df['CustomerID'].tolist()
+    )
+    
+    # 선택된 고객 데이터
+    customer_data = df[df['CustomerID'] == customer_id].iloc[0]
+    
+    # 레이아웃 설정
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # 이탈 확률 게이지
+        st.plotly_chart(
+            Visualizer.create_churn_gauge(customer_data['churn_probability']),
+            use_container_width=True
+        )
+        
+        # 고객 기본 정보
+        st.subheader("고객 기본 정보")
+        info_data = {
+            '거래기간': f"{customer_data['Tenure']}개월",
+            '선호 로그인 기기': customer_data['PreferredLoginDevice'],
+            '도시 등급': f"Tier {customer_data['CityTier']}",
+            '성별': customer_data['Gender']
         }
-    ))
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown("### 예측 근거")
-    st.markdown("""
-    <div style="border: 2px dashed gray; padding: 10px;">
-    <b style="background-color: yellow;">마지막 주문 기간 공백</b><br><br>
-    위 칼럼에 대해 저장해둔 대안(글)
-    </div>
-    """, unsafe_allow_html=True) 
+        st.write(pd.Series(info_data))
+    
+    with col2:
+        # 주문 관련 정보
+        st.subheader("주문 정보")
+        order_data = {
+            '주문 횟수': customer_data['OrderCount'],
+            '마지막 주문 후 일수': customer_data['DaySinceLastOrder'],
+            '주문 금액 상승률': f"{customer_data['OrderAmountHikeFromlastYear']}%",
+            '캐쉬백 금액': f"${customer_data['CashbackAmount']:.2f}"
+        }
+        st.write(pd.Series(order_data))
+        
+        # 만족도 정보
+        st.subheader("만족도 정보")
+        satisfaction_data = {
+            '만족도 점수': customer_data['SatisfactionScore'],
+            '불만 제기 여부': '예' if customer_data['Complain'] else '아니오',
+            '앱 사용 시간': f"{customer_data['HourSpendOnApp']}시간"
+        }
+        st.write(pd.Series(satisfaction_data))
+    
+    # 추가 시각화
+    st.subheader("고객 행동 분석")
+    
+    # 주문 카테고리 선호도
+    category_data = df[df['CustomerID'] == customer_id][['PreferedOrderCat']].value_counts().reset_index()
+    st.plotly_chart(
+        Visualizer.create_bar_chart(
+            category_data,
+            x='PreferedOrderCat',
+            y='count',
+            title='선호 주문 카테고리'
+        ),
+        use_container_width=True
+    ) 
