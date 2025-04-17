@@ -18,14 +18,21 @@ logger = setup_logger(__name__)
 class ChurnPredictor:
     """고객 이탈 예측을 위한 모델 클래스"""
     
-    def __init__(self, model_path=None):
-        """모델을 로드하고 초기화합니다."""
+    def __init__(self, model_path=None, strict_mode=False):
+        """모델을 로드하고 초기화합니다.
+        
+        Args:
+            model_path (str, optional): 모델 파일 경로. 기본값은 None.
+            strict_mode (bool, optional): 모델이 인식하지 못하는 범주값이 있을 때 예측을 중단할지 여부. 기본값은 False.
+        """
         self.model = None
         if model_path is None:
             self.model_path = Path(__file__).parent / "xgboost_best_model.pkl"
         else:
             self.model_path = model_path
         self.feature_importance_cache = None  # 특성 중요도 캐시 추가
+        self.strict_mode = strict_mode  # 엄격한 모드 여부 (True면 인식못하는 값이 있을 때 예측 중단)
+        
         try:
             self.load_model()
         except Exception as e:
@@ -179,9 +186,6 @@ class ChurnPredictor:
             pd.DataFrame: 모델 입력에 맞게 전처리된 데이터
         """
         try:
-            # 0. 모델 설정 확인
-            self.strict_mode = False  # 기본적으로 유연한 모드 사용 (예측 계속 진행)
-            
             # 1. 원본 데이터 로깅
             st.write(f"🔍 [전처리]: 원본 데이터 크기: {data.shape}")
             
@@ -610,6 +614,45 @@ class ChurnPredictor:
         st.write(f"- 언더스코어(_) 포함: {features_info['has_underscore_count']}개")
         st.write(f"- 숫자 포함: {features_info['has_digit_count']}개")
         st.write(f"- 대문자 포함: {features_info['has_uppercase_count']}개")
+
+    def set_strict_mode(self, strict_mode=True):
+        """
+        모델이 인식하지 못하는 범주값이 있을 때의 동작 모드를 설정합니다.
+        
+        Args:
+            strict_mode (bool): True면 예측을 중단하고, False면 자동 대체를 사용합니다.
+        """
+        self.strict_mode = strict_mode
+        mode_text = "엄격한 모드" if strict_mode else "유연한 모드"
+        st.info(f"✓ 예측 모드를 '{mode_text}'로 설정했습니다.")
+        
+        if strict_mode:
+            st.write("- 모델이 인식하지 못하는 범주값이 있으면 예측을 중단합니다.")
+        else:
+            st.write("- 모델이 인식하지 못하는 범주값이 있어도 자동 대체를 통해 예측을 계속합니다.")
+        
+        return self.strict_mode
+    
+    def get_possible_values(self):
+        """
+        모델이 인식하는 각 범주형 변수의 가능한 값 목록을 반환합니다.
+        
+        Returns:
+            dict: 각 범주형 변수별 가능한 값 목록
+        """
+        if self.model is None or not hasattr(self.model, 'feature_names_in_'):
+            st.error("⚠️ 모델이 로드되지 않았거나 feature_names_in_ 속성이 없습니다.")
+            return {}
+        
+        # 원핫인코딩된 특성 구조 가져오기
+        encoded_features = self.get_onehot_encoded_features()
+        
+        # 각 범주형 변수별 가능한 값 목록 추출
+        category_values = {}
+        for prefix, features in encoded_features.items():
+            category_values[prefix] = [f.split('_', 1)[1] for f in features]
+        
+        return category_values
 
 
 ########## 함수영역역 ##########
