@@ -23,17 +23,21 @@ class ChurnPredictor:
         self.model = None
         self.feature_importance_cache = {}
         self.model_path = Path(__file__).parent / "xgb_best_model.pkl"
+        st.write(f"DEBUG: 모델 경로: {self.model_path}")
+        st.write(f"DEBUG: 모델 파일 존재: {self.model_path.exists()}")
         try:
             self.load_model()
+            st.write("DEBUG: 모델 로드 성공")
         except Exception as e:
             logger.error(f"모델 로드 오류: {str(e)}")
-            st.error(f"모델 로드 중 오류가 발생했습니다.")
+            st.error(f"모델 로드 중 오류가 발생했습니다: {str(e)}")
     
     def load_model(self):
         """모델 파일을 로드합니다."""
         try:
             if not self.model_path.exists():
                 logger.error(f"모델 파일을 찾을 수 없습니다: {self.model_path}")
+                st.error(f"모델 파일을 찾을 수 없습니다: {self.model_path}")
                 return False
             
             self.model = joblib.load(self.model_path)
@@ -41,6 +45,7 @@ class ChurnPredictor:
             return True
         except Exception as e:
             logger.error(f"모델 로드 실패: {str(e)}")
+            st.error(f"모델 로드 실패: {str(e)}")
             return False
     
     def predict(self, input_df):
@@ -56,38 +61,49 @@ class ChurnPredictor:
         try:
             # 모델이 없으면 로드 시도
             if self.model is None:
+                st.write("DEBUG: 모델이 없어 로드 시도")
                 self.load_model()
                 
             # 모델 로드 실패 시 기본값 반환
             if self.model is None:
+                st.write("DEBUG: 모델 로드 실패, 기본값 반환")
                 return self._default_prediction()
             
             # 데이터 전처리
             processed_df = self._preprocess_data(input_df)
+            st.write(f"DEBUG: 전처리된 데이터 컬럼: {', '.join(processed_df.columns)}")
             
             # 예측 수행
             try:
+                st.write("DEBUG: 예측 시작")
                 y_pred = self.model.predict(processed_df)
                 y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+                st.write(f"DEBUG: 예측 완료, 결과: {y_proba[0]}")
                 
                 # 예측 결과 확인
                 if len(y_proba) == 0:
+                    st.write("DEBUG: 예측 결과 없음, 기본값 반환")
                     return self._default_prediction()
                 
                 # 성공적으로 예측한 경우 특성 중요도 계산
                 try:
+                    st.write("DEBUG: 특성 중요도 계산 시작")
                     self._compute_feature_importance(processed_df)
-                except:
+                    st.write("DEBUG: 특성 중요도 계산 완료")
+                except Exception as e:
                     # 특성 중요도 계산 실패해도 예측 결과는 반환
+                    st.write(f"DEBUG: 특성 중요도 계산 실패: {str(e)}")
                     pass
                 
                 return y_pred, y_proba
             except Exception as e:
                 logger.error(f"예측 오류: {str(e)}")
+                st.error(f"예측 오류: {str(e)}")
                 return self._default_prediction()
                 
         except Exception as e:
             logger.error(f"예측 처리 중 오류: {str(e)}")
+            st.error(f"예측 처리 중 오류: {str(e)}")
             return self._default_prediction()
     
     def _default_prediction(self):
@@ -112,47 +128,25 @@ class ChurnPredictor:
         return df
     
     def _compute_feature_importance(self, input_df):
-        """SHAP 값을 사용하여 특성 중요도를 계산합니다."""
+        """모델의 feature_importances_ 속성을 사용하여 특성 중요도를 계산합니다."""
         if self.model is None:
+            st.write("DEBUG: 모델이 없어 특성 중요도 계산 불가")
             return
             
         try:
-            # SHAP 사용 시도
-            explainer = shap.TreeExplainer(self.model)
-            shap_values = explainer.shap_values(input_df)
-            
-            # 클래스가 2개인 경우 1번 클래스(이탈)에 대한 SHAP 값 사용
-            if isinstance(shap_values, list):
-                shap_values = shap_values[1]
-            
-            # 특성별 중요도 계산
-            importance_dict = {}
-            for i, col in enumerate(input_df.columns):
-                importance_dict[col] = np.abs(shap_values[0][i])
-            
-            self.feature_importance_cache = importance_dict
-        except Exception as e:
-            # SHAP 사용 실패 시 대체 방법으로 특성 중요도 계산
-            try:
-                # 모델이 feature_importances_ 속성을 가지고 있는 경우
-                if hasattr(self.model, 'feature_importances_'):
-                    importance_dict = {}
-                    for i, col in enumerate(input_df.columns):
-                        if i < len(self.model.feature_importances_):
-                            importance_dict[col] = self.model.feature_importances_[i]
-                    self.feature_importance_cache = importance_dict
-                else:
-                    # 기본 중요도 설정
-                    self.feature_importance_cache = {
-                        'Tenure': 0.25,
-                        'SatisfactionScore': 0.22,
-                        'DaySinceLastOrder': 0.18,
-                        'OrderCount': 0.15,
-                        'HourSpendOnApp': 0.12,
-                        'Complain': 0.08
-                    }
-            except:
-                # 모든 방법 실패 시 기본 중요도 사용
+            # SHAP 사용하지 않고 직접 feature_importances_ 사용
+            st.write("DEBUG: feature_importances_ 속성 확인")
+            if hasattr(self.model, 'feature_importances_'):
+                st.write("DEBUG: feature_importances_ 속성 있음")
+                importance_dict = {}
+                for i, col in enumerate(input_df.columns):
+                    if i < len(self.model.feature_importances_):
+                        importance_dict[col] = self.model.feature_importances_[i]
+                self.feature_importance_cache = importance_dict
+                st.write(f"DEBUG: 특성 중요도 계산 결과: {importance_dict}")
+            else:
+                st.write("DEBUG: feature_importances_ 속성 없음, 기본값 사용")
+                # 기본 중요도 설정
                 self.feature_importance_cache = {
                     'Tenure': 0.25,
                     'SatisfactionScore': 0.22,
@@ -161,6 +155,17 @@ class ChurnPredictor:
                     'HourSpendOnApp': 0.12,
                     'Complain': 0.08
                 }
+        except Exception as e:
+            st.write(f"DEBUG: 특성 중요도 계산 중 오류: {str(e)}")
+            # 모든 방법 실패 시 기본 중요도 사용
+            self.feature_importance_cache = {
+                'Tenure': 0.25,
+                'SatisfactionScore': 0.22,
+                'DaySinceLastOrder': 0.18,
+                'OrderCount': 0.15,
+                'HourSpendOnApp': 0.12,
+                'Complain': 0.08
+            }
     
     def get_feature_importance(self):
         """
