@@ -12,7 +12,13 @@ def show_customer_churn_analysis():
     """
     try:
         # 데이터 분석 실행
+        st.write("데이터 분석을 시작합니다...")
         result_df = analyze_customers()
+        
+        # 결과 데이터 확인
+        st.write("분석 결과 데이터 확인:")
+        st.write(f"컬럼 목록: {result_df.columns.tolist()}")
+        st.write(f"데이터 형태: {result_df.shape}")
         
         # 결과 표시
         st.subheader("고객 이탈 예측 결과")
@@ -54,6 +60,8 @@ def show_customer_churn_analysis():
         
     except Exception as e:
         st.error(f"데이터 분석 중 오류가 발생했습니다: {str(e)}")
+        st.error(f"에러 타입: {type(e).__name__}")
+        st.error(f"에러 상세 정보: {str(e)}")
 
 def display_customer_info(customer_data):
     """
