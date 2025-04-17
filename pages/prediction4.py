@@ -76,3 +76,40 @@ if uploaded_file:
     df_recovered = reverse_one_hot_columns(df_encoded)
     st.subheader("🔍 복원된 고객 데이터 (한글 컬럼)")
     st.dataframe(df_recovered.head())
+
+# ✅ 고객 ID 생성
+df["고객ID"] = [str(uuid.uuid4())[:8] for _ in range(len(df))]
+
+# ✅ 모델 로드 및 예측 수행
+model = load_xgboost_model2()
+predictor = ChurnPredictor2(external_model=model)
+
+# 예측용 데이터 인코딩
+df_encoded = pd.get_dummies(df.drop(columns=["고객ID"]))
+model_features = predictor.model.get_booster().feature_names
+
+# 누락된 컬럼 채우기
+for col in model_features:
+    if col not in df_encoded.columns:
+        df_encoded[col] = 0
+df_encoded = df_encoded[model_features]
+
+# 예측 수행
+_, y_proba = predictor.predict(df_encoded)
+df["이탈확률"] = y_proba
+
+# ✅ 위험군 분류
+def 분류(prob):
+    if prob >= 0.9:
+        return "초고위험군"
+    elif prob >= 0.7:
+        return "고위험군"
+    elif prob >= 0.5:
+        return "주의단계"
+    else:
+        return "관찰단계"
+
+df["위험군"] = df["이탈확률"].apply(분류)
+
+# ✅ 확인 출력
+st.success(f"✅ 총 {len(df)}명의 고객에게 ID를 부여하고 이탈 위험도를 분류했습니다.")
