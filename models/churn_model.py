@@ -204,7 +204,7 @@ class ChurnPredictor:
 # ===============================
 # ✅ 모델 로드 및 예측 함수
 # ===============================
-MODEL_PATH = Path(__file__).parent / "xgboost_best_model.pkl"
+MODEL_PATH = Path(__file__).parent / "xgb_best_model.pkl"
 
 def load_churn_model(model_path: str = None):
     """
@@ -517,7 +517,27 @@ def show_top_influencers(model, X_input):
 
 
 ##########################
+MODEL_PATH = Path(__file__).parent / "xgboost_best_model.pkl"
 
+def load_churn_model2(model_path: str = None):
+    """
+    Load the trained churn prediction model.
+    
+    Args:
+        model_path: Path to the model file. Default is models/xgb_best_model.pkl
+        
+    Returns:
+        Trained model
+    """
+    if model_path is None:
+        model_path = Path(__file__).parent / "xgb_best_model.pkl"
+    else:
+        model_path = Path(model_path)
+        
+    if not model_path.exists():
+        raise FileNotFoundError(f"Model file not found: {model_path}")
+        
+    return joblib.load(model_path)
 
 
 
