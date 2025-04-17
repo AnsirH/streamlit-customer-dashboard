@@ -25,6 +25,16 @@ class ChurnPredictor:
         self.model_path = Path(__file__).parent / "xgb_best_model.pkl"
         st.write(f"DEBUG: 모델 경로: {self.model_path}")
         st.write(f"DEBUG: 모델 파일 존재: {self.model_path.exists()}")
+        
+        # 원본 데이터셋 확인 시도
+        excel_path = Path(__file__).parent / "E Commerce Dataset2.xlsx"
+        if excel_path.exists():
+            try:
+                df = pd.read_excel(excel_path)
+                st.write("DEBUG: 원본 데이터셋 컬럼명:", df.columns.tolist()[:10])  # 처음 10개만 표시
+            except Exception as e:
+                st.write(f"DEBUG: 원본 데이터셋 읽기 실패: {str(e)}")
+        
         try:
             self.load_model()
             st.write("DEBUG: 모델 로드 성공")
@@ -120,49 +130,18 @@ class ChurnPredictor:
             tuple: (예측 클래스, 이탈 확률)
         """
         try:
-            st.write("DEBUG: 입력 데이터 컬럼 -", input_df.columns.tolist())
+            # 원본 데이터 확인
+            st.write("DEBUG: 원본 입력 데이터:")
+            st.write(input_df)
             
             # 테스트 모드 사용 - 실제 모델 대신 테스트 예측 사용
             st.write("DEBUG: 테스트 모드로 예측 수행")
-            return self._test_prediction(input_df)
+            result = self._test_prediction(input_df)
             
-            # 아래 코드는 모델 디버깅 완료 후 주석 해제
-            """
-            # 모델이 없으면 로드 시도
-            if self.model is None:
-                st.write("DEBUG: 모델이 없어 로드 시도")
-                self.load_model()
-                
-            # 모델 로드 실패 시 기본값 반환
-            if self.model is None:
-                st.write("DEBUG: 모델 로드 실패, 기본값 반환")
-                return self._default_prediction()
+            # 디버깅을 위한 결과 출력
+            st.write(f"DEBUG: 예측 결과 - 클래스: {result[0][0]}, 확률: {result[1][0]}")
             
-            # 데이터 전처리
-            processed_df = self._preprocess_data(input_df)
-            
-            # 예측 수행
-            try:
-                st.write("DEBUG: 예측 시작")
-                y_pred = self.model.predict(processed_df)
-                y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
-                
-                # 예측 결과 확인
-                if len(y_proba) == 0:
-                    return self._default_prediction()
-                
-                # 성공적으로 예측한 경우 특성 중요도 계산
-                try:
-                    self._compute_feature_importance(processed_df)
-                except Exception as e:
-                    # 특성 중요도 계산 실패해도 예측 결과는 반환
-                    pass
-                
-                return y_pred, y_proba
-            except Exception as e:
-                logger.error(f"예측 오류: {str(e)}")
-                return self._default_prediction()
-            """
+            return result
                 
         except Exception as e:
             logger.error(f"예측 처리 중 오류: {str(e)}")
