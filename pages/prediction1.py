@@ -34,10 +34,12 @@ class ChurnPredictor:
                 return False
             
             self.model = joblib.load(self.model_path)
-            st.write(f"🔍 모델 로드 성공: {self.model_path}")
+            st.success(f"✅ 모델 로드 성공: {self.model_path.name}")
             return True
         except Exception as e:
             st.error(f"모델 로드 실패: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
             return False
     
     def predict(self, input_df):
@@ -46,45 +48,43 @@ class ChurnPredictor:
             # 모델이 없으면 로드 시도
             if self.model is None:
                 if not self.load_model():
+                    st.error("⚠️ 모델 로드 실패! 기본값 반환")
                     return np.array([0]), np.array([0.5])  # 기본값 반환
             
             # 디버그: 모델의 특성 이름 확인
-            st.write("### 원본 모델 특성명 (전처리 전)")
-            if hasattr(self.model, 'feature_names_in_'):
-                st.write("모델 특성 수:", len(self.model.feature_names_in_))
-                st.write("모델 특성명:", sorted(self.model.feature_names_in_))
+            with st.expander("디버그: 모델 정보"):
+                st.write("### 모델 정보")
+                st.write("모델 파일 경로:", self.model_path)
+                st.write("모델 타입:", type(self.model).__name__)
+                
+                if hasattr(self.model, 'feature_names_in_'):
+                    st.write("### 모델 특성 정보")
+                    st.write("모델 특성 수:", len(self.model.feature_names_in_))
+                    
+                    # 원핫인코딩된 특성 확인
+                    encoded_features = {}
+                    normal_features = []
+                    for feature in self.model.feature_names_in_:
+                        if '_' in feature:
+                            prefix = feature.split('_')[0]
+                            if prefix not in encoded_features:
+                                encoded_features[prefix] = []
+                            encoded_features[prefix].append(feature)
+                        else:
+                            normal_features.append(feature)
+                    
+                    st.write("### 원핫인코딩된 특성 그룹")
+                    for prefix, features in encoded_features.items():
+                        with st.expander(f"{prefix} ({len(features)}개)"):
+                            st.write(sorted(features))
+                    
+                    st.write("### 일반 특성 목록")
+                    st.write(sorted(normal_features))
             
             # 데이터 전처리
             processed_df = self._preprocess_data(input_df)
             
             # 예측 수행
-            with st.expander("디버그: 전처리된 데이터"):
-                st.dataframe(processed_df)
-                if hasattr(self.model, 'feature_names_in_'):
-                    expected_cols = set(self.model.feature_names_in_)
-                    actual_cols = set(processed_df.columns)
-                    
-                    # 특성 매칭 확인
-                    st.write("### 컬럼명 일치 검사")
-                    st.write(f"모델 특성 수: {len(expected_cols)}")
-                    st.write(f"입력 특성 수: {len(actual_cols)}")
-                    
-                    missing = expected_cols - actual_cols
-                    extra = actual_cols - expected_cols
-                    
-                    if missing:
-                        st.error(f"⚠️ 누락된 특성: {missing}")
-                    else:
-                        st.success("✅ 모든 필요 특성이 존재합니다.")
-                        
-                    if extra:
-                        st.warning(f"⚠️ 추가 특성: {extra}")
-                    else:
-                        st.success("✅ 불필요한 특성이 없습니다.")
-                        
-                    if not missing and not extra:
-                        st.success("✅ 모델과 입력 특성이 완벽히 일치합니다!")
-            
             try:
                 # 예측 및 확률 계산
                 y_pred = self.model.predict(processed_df)
@@ -96,10 +96,14 @@ class ChurnPredictor:
                 return y_pred, y_proba
             except Exception as e:
                 st.error(f"예측 오류: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
                 return np.array([0]), np.array([0.5])  # 기본값 반환
                 
         except Exception as e:
             st.error(f"전체 예측 과정 오류: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
             return np.array([0]), np.array([0.5])  # 기본값 반환
     
     def _preprocess_data(self, input_df):
@@ -107,126 +111,236 @@ class ChurnPredictor:
         # 입력 데이터 복사
         df = input_df.copy()
         
-        st.write("### 전처리 시작")
-        st.write("원본 입력 컬럼:", sorted(df.columns.tolist()))
-        
-        # 컬럼명을 모두 소문자로 변경
-        df.columns = [col.lower() for col in df.columns]
-        st.write("소문자 변환 후 컬럼:", sorted(df.columns.tolist()))
-        
-        # CustomerID 제거 (예측에 사용되지 않음)
-        columns_to_remove = ['customerid', 'customer_id', 'cust_id', 'id']
-        for col in columns_to_remove:
-            if col in df.columns:
-                df = df.drop(col, axis=1)
-                st.write(f"컬럼 제거: {col}")
-        
-        # Boolean 타입 변환
-        if 'complain' in df.columns and isinstance(df['complain'].iloc[0], str):
-            df['complain'] = df['complain'].apply(lambda x: 1 if x == '예' else 0)
-            st.write("'complain' 컬럼 변환: 예/아니오 -> 1/0")
-        
-        # 컬럼명 매핑 (E Commerce Dataset2.xlsx와 일치시키기 위함)
-        column_mapping = {
-            'hour_spend_on_app': 'hourspendonapp',
-            'number_of_device_registered': 'numberofdeviceregistered',
-            'preferred_login_device': 'preferredlogindevice',
-            'preferred_payment_method': 'preferredpaymentmode',
-            'preferred_order_category': 'preferedordercat',
-            'order_amount_hike': 'orderamounthikefromlastyear',
-            'days_since_last_order': 'daysincelastorder',
-            'number_of_address': 'numberofaddress',
-            'marital_status': 'maritalstatus',
-            'satisfaction_score': 'satisfactionscore',
-            'warehouse_to_home': 'warehousetohome',
-            'coupon_used': 'couponused',
-            'order_count': 'ordercount',
-            'cashback_amount': 'cashbackamount',
-            'city_tier': 'citytier'
-        }
-        
-        # 컬럼명 변경 및 변경 로그 작성
-        rename_log = []
-        for old_col, new_col in column_mapping.items():
-            if old_col in df.columns:
-                df = df.rename(columns={old_col: new_col})
-                rename_log.append(f"{old_col} -> {new_col}")
-        
-        if rename_log:
-            st.write("### 컬럼명 매핑")
-            for log in rename_log:
-                st.write(log)
-        
-        st.write("매핑 후 컬럼:", sorted(df.columns.tolist()))
-        
-        # 원핫인코딩이 필요한 범주형 특성들 매핑
-        categorical_features = {
-            'preferredlogindevice': ['mobile', 'computer'],
-            'gender': ['male', 'female'],
-            'preferredpaymentmode': ['credit card', 'debit card', 'upi', 'cash on delivery'],
-            'preferedordercat': ['fashion', 'grocery', 'electronics', 'others'],
-            'maritalstatus': ['single', 'married', 'divorced']
-        }
-        
-        # 원핫인코딩 수행 및 로그 작성
-        onehot_log = []
-        for feature, categories in categorical_features.items():
-            if feature in df.columns:
-                # 현재 값 (소문자로 변환)
-                current_value = str(df[feature].iloc[0]).lower()
-                onehot_log.append(f"{feature}: '{current_value}'")
-                
-                # 원본 컬럼 제거
-                df = df.drop(feature, axis=1)
-                
-                # 각 카테고리에 대한 더미 변수 생성
-                for category in categories:
-                    col_name = f"{feature}_{category}"
-                    df[col_name] = 1 if current_value == category else 0
-                    onehot_log.append(f"  - {col_name}: {1 if current_value == category else 0}")
-        
-        if onehot_log:
-            st.write("### 원핫인코딩 변환")
-            for log in onehot_log:
-                st.write(log)
-        
-        st.write("원핫인코딩 후 컬럼:", sorted(df.columns.tolist()))
-        
-        # 모델에 필요한 컬럼 확인 및 조정
-        if hasattr(self.model, 'feature_names_in_'):
-            expected_columns = [col.lower() for col in self.model.feature_names_in_]
+        # 디버그 로그를 위한 expander 추가
+        with st.expander("디버그: 전처리 과정 상세 로그"):
+            st.write("### 전처리 시작")
+            st.write("원본 입력 컬럼:", sorted(df.columns.tolist()))
             
-            st.write("### 모델이 기대하는 컬럼 vs 현재 컬럼")
-            st.write("모델 기대 컬럼 수:", len(expected_columns))
-            st.write("현재 컬럼 수:", len(df.columns))
-            
-            # 누락된 컬럼 추가
-            missing_cols = []
-            for col in expected_columns:
-                if col not in df.columns:
-                    df[col] = 0
-                    missing_cols.append(col)
-            
-            if missing_cols:
-                st.write("### 누락된 컬럼(0으로 추가)")
-                for col in missing_cols:
-                    st.write(f"- {col}")
-            
-            # 불필요한 컬럼 제거
-            extra_cols = []
-            for col in list(df.columns):
-                if col not in expected_columns:
+            # CustomerID 제거 (예측에 사용되지 않음)
+            columns_to_remove = ['CustomerID', 'customer_id', 'customerid', 'cust_id', 'id', 'Customer_ID']
+            for col in columns_to_remove:
+                if col in df.columns:
                     df = df.drop(col, axis=1)
-                    extra_cols.append(col)
+                    st.write(f"컬럼 제거: {col}")
             
-            if extra_cols:
-                st.write("### 제거된 컬럼")
-                for col in extra_cols:
-                    st.write(f"- {col}")
+            # Boolean 타입 변환
+            if 'Complain' in df.columns and isinstance(df['Complain'].iloc[0], str):
+                df['Complain'] = df['Complain'].apply(lambda x: 1 if x == '예' else 0)
+                st.write("'Complain' 컬럼 변환: 예/아니오 -> 1/0")
+            elif 'complain' in df.columns and isinstance(df['complain'].iloc[0], str):
+                df['Complain'] = df['complain'].apply(lambda x: 1 if x == '예' else 0)
+                df = df.drop('complain', axis=1)
+                st.write("'complain' -> 'Complain' 컬럼 변환: 예/아니오 -> 1/0")
             
-            # 컬럼 순서 맞추기
-            df = df[expected_columns]
-            st.write("최종 컬럼 수:", len(df.columns))
+            # 컬럼명 매핑 (대문자 CamelCase로 변경)
+            column_mapping = {
+                'hour_spend_on_app': 'HourSpendOnApp',
+                'hourspendonapp': 'HourSpendOnApp',
+                'number_of_device_registered': 'NumberOfDeviceRegistered',
+                'numberofdeviceregistered': 'NumberOfDeviceRegistered',
+                'preferred_login_device': 'PreferredLoginDevice',
+                'preferredlogindevice': 'PreferredLoginDevice',
+                'preferred_payment_method': 'PreferredPaymentMode',
+                'preferredpaymentmode': 'PreferredPaymentMode',
+                'preferred_payment_mode': 'PreferredPaymentMode',
+                'preferred_order_category': 'PreferedOrderCat',
+                'preferedordercat': 'PreferedOrderCat',
+                'preferred_order_cat': 'PreferedOrderCat',
+                'order_amount_hike': 'OrderAmountHikeFromlastYear',
+                'orderamounthikefromlastyear': 'OrderAmountHikeFromlastYear',
+                'days_since_last_order': 'DaySinceLastOrder',
+                'daysincelastorder': 'DaySinceLastOrder',
+                'day_since_last_order': 'DaySinceLastOrder',
+                'number_of_address': 'NumberOfAddress',
+                'numberofaddress': 'NumberOfAddress',
+                'marital_status': 'MaritalStatus',
+                'maritalstatus': 'MaritalStatus',
+                'satisfaction_score': 'SatisfactionScore',
+                'satisfactionscore': 'SatisfactionScore',
+                'warehouse_to_home': 'WarehouseToHome',
+                'warehousetohome': 'WarehouseToHome',
+                'coupon_used': 'CouponUsed',
+                'couponused': 'CouponUsed',
+                'order_count': 'OrderCount',
+                'ordercount': 'OrderCount',
+                'cashback_amount': 'CashbackAmount',
+                'cashbackamount': 'CashbackAmount',
+                'city_tier': 'CityTier',
+                'citytier': 'CityTier',
+                'tenure': 'Tenure',
+                'gender': 'Gender'
+            }
+            
+            # 컬럼명 변경 및 변경 로그 작성
+            rename_log = []
+            for old_col, new_col in column_mapping.items():
+                if old_col in df.columns:
+                    df = df.rename(columns={old_col: new_col})
+                    rename_log.append(f"{old_col} -> {new_col}")
+            
+            if rename_log:
+                st.write("### 컬럼명 매핑")
+                for log in rename_log:
+                    st.write(log)
+            
+            st.write("매핑 후 컬럼:", sorted(df.columns.tolist()))
+            
+            # 원핫인코딩 변환
+            if hasattr(self.model, 'feature_names_in_'):
+                # 정확한 모델 특성명 가져오기
+                model_features = list(self.model.feature_names_in_)
+                
+                # One-hot 인코딩 대상 특성
+                categorical_cols = [
+                    'PreferredLoginDevice', 'PreferredPaymentMode', 'Gender', 
+                    'PreferedOrderCat', 'MaritalStatus'
+                ]
+                
+                # 각 특성별로 가능한 값 확인
+                categorical_values = {}
+                for col in categorical_cols:
+                    categorical_values[col] = []
+                    for feat in model_features:
+                        if feat.startswith(f"{col}_"):
+                            value = feat[len(col)+1:]
+                            categorical_values[col].append(value)
+                
+                st.write("### 모델의 원핫인코딩 특성")
+                for col, values in categorical_values.items():
+                    st.write(f"{col}: {values}")
+                
+                # 현재 데이터에서 원핫인코딩 수행
+                for col in categorical_cols:
+                    if col in df.columns:
+                        current_value = df[col].iloc[0]
+                        if isinstance(current_value, str):
+                            current_value = current_value.lower().replace(' ', '_')
+                        
+                        st.write(f"원핫인코딩: {col} = '{current_value}'")
+                        
+                        # 원본 컬럼 삭제
+                        df = df.drop(col, axis=1)
+                        
+                        # 각 가능한 값에 대해 변수 생성
+                        for value in categorical_values.get(col, []):
+                            col_name = f"{col}_{value}"
+                            
+                            # 값 비교 및 설정
+                            if col == 'PreferredLoginDevice':
+                                if 'Mobile' in str(current_value) and value == 'Mobile_Phone':
+                                    df[col_name] = 1
+                                    st.write(f"  - {col_name} = 1 (일치)")
+                                elif 'Computer' in str(current_value) and value == 'Phone':
+                                    df[col_name] = 1
+                                    st.write(f"  - {col_name} = 1 (일치)")
+                                else:
+                                    df[col_name] = 0
+                                    st.write(f"  - {col_name} = 0")
+                            elif col == 'Gender':
+                                if 'Male' in str(current_value) and value == 'Male':
+                                    df[col_name] = 1
+                                    st.write(f"  - {col_name} = 1 (일치)")
+                                else:
+                                    df[col_name] = 0
+                                    st.write(f"  - {col_name} = 0")
+                            elif col == 'PreferredPaymentMode':
+                                # 결제 방식 매핑
+                                payment_map = {
+                                    'credit_card': ['Credit_Card'],
+                                    'debit_card': ['Debit_Card'],
+                                    'upi': ['UPI'],
+                                    'cash_on_delivery': ['Cash_on_Delivery', 'COD'],
+                                    'e_wallet': ['E_wallet']
+                                }
+                                
+                                matched = False
+                                for key, options in payment_map.items():
+                                    if key in str(current_value).lower() and value in options:
+                                        df[col_name] = 1
+                                        st.write(f"  - {col_name} = 1 (일치: {key})")
+                                        matched = True
+                                        break
+                                
+                                if not matched:
+                                    df[col_name] = 0
+                                    st.write(f"  - {col_name} = 0")
+                            elif col == 'PreferedOrderCat':
+                                # 주문 카테고리 매핑
+                                category_map = {
+                                    'grocery': ['Grocery'],
+                                    'laptop': ['Laptop_&Accessory'],
+                                    'mobile': ['Mobile', 'Mobile_Phone'],
+                                    'electronics': ['Mobile', 'Mobile_Phone']
+                                }
+                                
+                                matched = False
+                                for key, options in category_map.items():
+                                    if key in str(current_value).lower() and value in options:
+                                        df[col_name] = 1
+                                        st.write(f"  - {col_name} = 1 (일치: {key})")
+                                        matched = True
+                                        break
+                                
+                                if not matched:
+                                    df[col_name] = 0
+                                    st.write(f"  - {col_name} = 0")
+                            elif col == 'MaritalStatus':
+                                if 'Single' in str(current_value) and value == 'Single':
+                                    df[col_name] = 1
+                                    st.write(f"  - {col_name} = 1 (일치)")
+                                elif 'Married' in str(current_value) and value == 'Married':
+                                    df[col_name] = 1
+                                    st.write(f"  - {col_name} = 1 (일치)")
+                                else:
+                                    df[col_name] = 0
+                                    st.write(f"  - {col_name} = 0")
+                            else:
+                                df[col_name] = 0
+                                st.write(f"  - {col_name} = 0")
+            
+            st.write("원핫인코딩 후 컬럼:", sorted(df.columns.tolist()))
+            
+            # 모델에 필요한 컬럼 확인 및 조정
+            if hasattr(self.model, 'feature_names_in_'):
+                expected_columns = list(self.model.feature_names_in_)
+                
+                st.write("### 모델이 기대하는 컬럼 vs 현재 컬럼")
+                st.write("모델 기대 컬럼 수:", len(expected_columns))
+                st.write("현재 컬럼 수:", len(df.columns))
+                
+                # 누락된 컬럼 추가
+                missing_cols = []
+                for col in expected_columns:
+                    if col not in df.columns:
+                        df[col] = 0
+                        missing_cols.append(col)
+                
+                if missing_cols:
+                    st.write("### 누락된 컬럼(0으로 추가)")
+                    for col in missing_cols:
+                        st.write(f"- {col}")
+                
+                # 불필요한 컬럼 제거
+                extra_cols = []
+                for col in list(df.columns):
+                    if col not in expected_columns:
+                        df = df.drop(col, axis=1)
+                        extra_cols.append(col)
+                
+                if extra_cols:
+                    st.write("### 제거된 컬럼")
+                    for col in extra_cols:
+                        st.write(f"- {col}")
+                
+                # 컬럼 순서 맞추기
+                df = df[expected_columns]
+                st.write("최종 컬럼 수:", len(df.columns))
+                
+                # 최종 확인
+                if set(df.columns) == set(expected_columns) and len(df.columns) == len(expected_columns):
+                    st.success("✅ 컬럼 매핑 완료! 모델과 데이터가 정확히 일치합니다.")
+                else:
+                    st.error("❌ 컬럼 매핑 불일치! 모델과 데이터가 일치하지 않습니다.")
         
         return df
     
