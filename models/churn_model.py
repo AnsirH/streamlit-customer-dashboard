@@ -18,12 +18,12 @@ logger = setup_logger(__name__)
 class ChurnPredictor:
     """고객 이탈 예측을 위한 모델 클래스"""
     
-    def __init__(self, model_path=None, strict_mode=False):
+    def __init__(self, model_path=None, ignore_unknown_values=True):
         """모델을 로드하고 초기화합니다.
         
         Args:
             model_path (str, optional): 모델 파일 경로. 기본값은 None.
-            strict_mode (bool, optional): 모델이 인식하지 못하는 범주값이 있을 때 예측을 중단할지 여부. 기본값은 False.
+            ignore_unknown_values (bool, optional): 모델이 인식하지 못하는 범주값이 있을 때 해당 특성을 무시할지 여부. 기본값은 True.
         """
         self.model = None
         if model_path is None:
@@ -31,7 +31,7 @@ class ChurnPredictor:
         else:
             self.model_path = model_path
         self.feature_importance_cache = None  # 특성 중요도 캐시 추가
-        self.strict_mode = strict_mode  # 엄격한 모드 여부 (True면 인식못하는 값이 있을 때 예측 중단)
+        self.ignore_unknown_values = True  # 항상 알 수 없는 값을 무시하도록 설정
         
         try:
             self.load_model()
@@ -84,17 +84,10 @@ class ChurnPredictor:
             
             # 4. 모델이 인식하지 못하는 범주값이 있는 경우
             if not safe_prediction:
-                # 4.1 엄격한 모드: 예측 중단
-                if self.strict_mode:
-                    st.error("⚠️ 모델이 인식하지 못하는 범주값이 있어 예측을 중단합니다.")
-                    for cat, values in unknown_values.items():
-                        st.error(f"- '{cat}' 변수에 알 수 없는 값: {values}")
-                    return None, None
-                # 4.2 유연한 모드: 경고 표시 후 계속 진행 (자동 대체)
-                else:
-                    st.warning("⚠️ 모델이 인식하지 못하는 범주값이 있습니다. 자동 대체 사용.")
-                    for cat, values in unknown_values.items():
-                        st.warning(f"- '{cat}' 변수에 알 수 없는 값: {values}")
+                # 경고 표시 후 계속 진행
+                st.warning("⚠️ 모델이 인식하지 못하는 범주값이 있습니다.")
+                for cat, values in unknown_values.items():
+                    st.warning(f"- '{cat}' 변수에 알 수 없는 값: {values} (이 특성은 무시됩니다)")
             
             # 5. 데이터 전처리
             processed_df = self._preprocess_data(input_df)
@@ -105,11 +98,8 @@ class ChurnPredictor:
                 y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
                 
                 # 7. 불확실성 정보 추가 (모델이 인식하지 못하는 범주값이 있는 경우)
-                if not safe_prediction and not self.strict_mode:
-                    # 7.1 예측 불확실성 경고
-                    st.warning("⚠️ 모델이 인식하지 못하는 범주값이 있어 예측 결과의 신뢰도가 낮을 수 있습니다.")
-                    # 7.2 불확실성을 반영한 확률 조정 (선택 사항)
-                    # y_proba = self._adjust_probability_for_uncertainty(y_proba, unknown_values)
+                if not safe_prediction:
+                    st.warning("⚠️ 일부 특성이 무시되어 예측 결과가 부정확할 수 있습니다.")
                 
                 # 8. 예측 성공 시 특성 중요도 계산 (선택 사항)
                 try:
@@ -178,6 +168,7 @@ class ChurnPredictor:
         """
         모델 예측을 위해 입력 데이터를 전처리합니다.
         모델이 요구하는 정확한 특성 구조와 일치하는 데이터를 생성합니다.
+        모델이 인식하지 못하는 범주값이 있는 특성은 무시합니다 (모든 원핫인코딩 컬럼을 0으로 설정).
         
         Args:
             data (pd.DataFrame): 전처리할 입력 데이터
@@ -221,8 +212,8 @@ class ChurnPredictor:
             for feature in model_features:
                 result_df[feature] = 0
             
-            # 9. 범주형 변수 처리 및 임의 값 매핑 기록
-            fallback_mappings = {}  # 매핑 정보 저장
+            # 9. 무시된 특성 정보 저장
+            ignored_features = {}
             
             # 10. 각 범주형 변수 처리
             for prefix in categorical_cols:
@@ -241,32 +232,10 @@ class ChurnPredictor:
                             # 10.4 존재하는 경우 해당 컬럼을 1로 설정
                             result_df.loc[idx, expected_col] = 1
                         else:
-                            # 10.5 존재하지 않는 경우 대체 전략 적용
+                            # 10.5 존재하지 않는 경우: 해당 특성 무시
                             st.warning(f"⚠️ '{prefix}'의 값 '{input_value}'에 대한 원핫인코딩 컬럼이 모델에 없습니다.")
-                            
-                            if prefix in category_values and category_values[prefix]:
-                                # 10.6 유사도 기반 매핑 시도
-                                possible_values = category_values[prefix]
-                                
-                                # 10.6.1 방법 1: 정확히 대소문자만 다른 경우
-                                case_insensitive_match = next((val for val in possible_values 
-                                                       if val.lower() == input_value.lower()), None)
-                                
-                                if case_insensitive_match:
-                                    # 대소문자 차이만 있는 매칭 사용
-                                    fallback_col = f"{prefix}_{case_insensitive_match}"
-                                    result_df.loc[idx, fallback_col] = 1
-                                    fallback_mappings[input_value] = case_insensitive_match
-                                    st.write(f"✓ 대소문자 무시 매핑: '{input_value}' → '{case_insensitive_match}'")
-                                else:
-                                    # 10.6.2 방법 2: 첫 번째 값 사용 (기본값)
-                                    fallback_value = possible_values[0]  # 첫 번째 값을 기본값으로 사용
-                                    fallback_col = f"{prefix}_{fallback_value}"
-                                    result_df.loc[idx, fallback_col] = 1
-                                    fallback_mappings[input_value] = fallback_value
-                                    st.write(f"✓ 기본값 매핑: '{input_value}' → '{fallback_value}' (첫 번째 값)")
-                            else:
-                                st.error(f"⚠️ '{prefix}'에 대한 가능한 값 목록을 찾을 수 없습니다!")
+                            ignored_features[prefix] = input_value
+                            st.write(f"✓ '{prefix}'의 값 '{input_value}'은(는) 무시됩니다.")
             
             # 11. 범주형이 아닌 일반 특성 처리
             for feature in model_features:
@@ -274,11 +243,16 @@ class ChurnPredictor:
                 if '_' not in feature and feature in data.columns:
                     result_df[feature] = data[feature]
             
-            # 12. 디버깅: 대체 매핑 정보 출력
-            if fallback_mappings:
-                st.write("### ⚠️ 원핫인코딩 값 대체 정보")
-                for original, replacement in fallback_mappings.items():
-                    st.write(f"- '{original}' → '{replacement}'")
+            # 12. 디버깅: 무시된 특성 정보 출력
+            if ignored_features:
+                st.write("### ⚠️ 무시된 특성 정보")
+                for prefix, value in ignored_features.items():
+                    ohe_cols = [col for col in model_features if col.startswith(f"{prefix}_")]
+                    st.write(f"- '{prefix}'의 값 '{value}' 무시됨 (관련 컬럼 {len(ohe_cols)}개가 모두 0으로 설정됨)")
+                    if len(ohe_cols) <= 10:  # 컬럼 수가 적으면 모두 표시
+                        st.write(f"  - 관련 컬럼: {ohe_cols}")
+                    else:
+                        st.write(f"  - 관련 컬럼 일부: {ohe_cols[:5]}... (총 {len(ohe_cols)}개)")
             
             # 13. 결과 데이터 검증
             if set(result_df.columns) != set(model_features):
@@ -317,10 +291,13 @@ class ChurnPredictor:
                             active_values = [col.split('_', 1)[1] for col in active_cols]
                             st.write(f"✓ '{prefix}': 입력값 '{input_value}' → 활성화된 값: {active_values}")
                         else:
-                            # 활성화된 컬럼이 없는 경우 (중요한 오류!)
-                            st.error(f"⚠️ '{prefix}'에 대해 활성화된 원핫인코딩 컬럼이 없습니다!")
-                            st.write(f"  - 원본 값: '{input_value}'")
-                            st.write(f"  - 가능한 값: {category_values.get(prefix, [])}")
+                            # 활성화된 컬럼이 없는 경우 (무시된 경우)
+                            if prefix in ignored_features:
+                                st.write(f"✓ '{prefix}': 입력값 '{input_value}'은(는) 무시됨 (모든 컬럼이 0)")
+                            else:
+                                st.error(f"⚠️ '{prefix}'에 대해 활성화된 원핫인코딩 컬럼이 없습니다!")
+                                st.write(f"  - 원본 값: '{input_value}'")
+                                st.write(f"  - 가능한 값: {category_values.get(prefix, [])}")
             
             # 16. 전처리 완료
             st.write(f"🔍 [전처리]: 데이터 처리 완료, 최종 크기: {result_df.shape}")
@@ -615,23 +592,15 @@ class ChurnPredictor:
         st.write(f"- 숫자 포함: {features_info['has_digit_count']}개")
         st.write(f"- 대문자 포함: {features_info['has_uppercase_count']}개")
 
-    def set_strict_mode(self, strict_mode=True):
+    def set_ignore_unknown_values(self, ignore=True):
         """
-        모델이 인식하지 못하는 범주값이 있을 때의 동작 모드를 설정합니다.
-        
-        Args:
-            strict_mode (bool): True면 예측을 중단하고, False면 자동 대체를 사용합니다.
+        이 메서드는 더 이상 사용되지 않습니다.
+        모델은 항상 인식하지 못하는 범주값이 있는 특성을 무시합니다.
         """
-        self.strict_mode = strict_mode
-        mode_text = "엄격한 모드" if strict_mode else "유연한 모드"
-        st.info(f"✓ 예측 모드를 '{mode_text}'로 설정했습니다.")
+        st.info("✓ 모델은 항상 인식하지 못하는 범주값이 있는 특성을 무시합니다.")
+        st.write("- 모델이 인식하지 못하는 범주값이 있는 경우, 해당 특성은 완전히 무시됩니다 (모든 원핫인코딩 컬럼이 0으로 설정됨).")
         
-        if strict_mode:
-            st.write("- 모델이 인식하지 못하는 범주값이 있으면 예측을 중단합니다.")
-        else:
-            st.write("- 모델이 인식하지 못하는 범주값이 있어도 자동 대체를 통해 예측을 계속합니다.")
-        
-        return self.strict_mode
+        return True
     
     def get_possible_values(self):
         """
@@ -653,7 +622,6 @@ class ChurnPredictor:
             category_values[prefix] = [f.split('_', 1)[1] for f in features]
         
         return category_values
-
 
 ########## 함수영역역 ##########
 
