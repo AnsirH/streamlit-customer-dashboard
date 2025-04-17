@@ -618,11 +618,34 @@ def show():
                             
                             if hasattr(predictor.model, 'feature_importances_'):
                                 st.write("### 모델 특성 중요도")
-                                importance_df = pd.DataFrame({
-                                    '특성': input_df.columns,
-                                    '중요도': predictor.model.feature_importances_
-                                })
-                                st.dataframe(importance_df.sort_values('중요도', ascending=False))
+                                feature_importances = predictor.model.feature_importances_
+                                
+                                # 처리된 데이터프레임의 컬럼 가져오기
+                                processed_df = predictor._preprocess_data(input_df)
+                                
+                                # 컬럼과 특성 중요도 길이 확인 및 조정
+                                if len(feature_importances) == len(processed_df.columns):
+                                    # 컬럼 수와 특성 중요도 수가 일치할 때
+                                    importance_df = pd.DataFrame({
+                                        '특성': processed_df.columns,
+                                        '중요도': feature_importances
+                                    })
+                                    st.dataframe(importance_df.sort_values('중요도', ascending=False))
+                                elif hasattr(predictor.model, 'feature_names_in_'):
+                                    # 모델이 feature_names_in_ 속성을 가지고 있을 때
+                                    importance_df = pd.DataFrame({
+                                        '특성': predictor.model.feature_names_in_,
+                                        '중요도': feature_importances
+                                    })
+                                    st.dataframe(importance_df.sort_values('중요도', ascending=False))
+                                else:
+                                    # 길이 불일치 시 인덱스만 사용
+                                    st.warning(f"특성 중요도({len(feature_importances)})와 입력 컬럼 수({len(processed_df.columns)})가 일치하지 않습니다.")
+                                    importance_df = pd.DataFrame({
+                                        '특성 인덱스': range(len(feature_importances)),
+                                        '중요도': feature_importances
+                                    })
+                                    st.dataframe(importance_df.sort_values('중요도', ascending=False))
                         
                         with debug_tabs[2]:
                             st.write("### 예측 과정")
