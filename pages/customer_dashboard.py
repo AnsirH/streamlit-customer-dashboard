@@ -14,17 +14,52 @@ def show_customer_churn_analysis():
     - 이탈 예측에 영향을 많이 끼친 상위 3개 컬럼
     """
     try:
-        # 데이터 분석 실행
-        result_df = ModelPredictor.analyze_customers()
+        # 데이터 분석 실행 (캐시 사용)
+        @st.cache_data
+        def load_analysis_data():
+            with st.spinner("데이터 분석을 시작합니다..."):
+                return analyze_customers()
+        
+        result_df = load_analysis_data()
         
         # 결과 표시
         st.subheader("고객 이탈 예측 결과")
         
-        # 컬럼명 변경
+        # 필터 컨테이너 생성
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            # 이탈률 필터 추가
+            filter_options = ["전체", "20% 이상", "50% 이상", "70% 이상", "90% 이상"]
+            selected_filter = st.selectbox("이탈률 필터", filter_options)
+        
+        with col2:
+            # 고객 ID 검색 기능 추가
+            search_id = st.text_input("고객 ID 검색", placeholder="고객 ID를 입력하세요")
+        
+        # 필터링된 데이터프레임 생성
         display_df = result_df[['CustomerID', 'Churn Risk', 
                               'Top Feature 1', 'Importance 1',
                               'Top Feature 2', 'Importance 2',
                               'Top Feature 3', 'Importance 3']].copy()
+        
+        # 고객 ID 검색이 있는 경우 이탈률 필터를 "전체"로 설정
+        if search_id:
+            selected_filter = "전체"
+            try:
+                search_id = int(search_id)
+                display_df = display_df[display_df['CustomerID'] == search_id]
+            except ValueError:
+                st.warning("올바른 고객 ID를 입력해주세요.")
+        # 고객 ID 검색이 없는 경우에만 이탈률 필터 적용
+        elif selected_filter != "전체":
+            threshold = float(selected_filter.split("%")[0]) / 100
+            display_df = display_df[display_df['Churn Risk'] >= threshold]
+            # 이탈률 기준으로 내림차순 정렬
+            display_df = display_df.sort_values('Churn Risk', ascending=False)
+        else:
+            # 전체 데이터는 고객 ID 기준으로 정렬
+            display_df = display_df.sort_values('CustomerID', ascending=True)
         
         # 컬럼명 변경
         display_df.columns = ['고객 ID', '이탈 위험도',
@@ -34,9 +69,30 @@ def show_customer_churn_analysis():
         
         # 이탈 위험도와 중요도를 퍼센트로 변환
         display_df['이탈 위험도'] = display_df['이탈 위험도'].apply(lambda x: f"{x:.1%}")
-        display_df['중요도 1'] = display_df['중요도 1'].apply(lambda x: f"{x:.1%}")
-        display_df['중요도 2'] = display_df['중요도 2'].apply(lambda x: f"{x:.1%}")
-        display_df['중요도 3'] = display_df['중요도 3'].apply(lambda x: f"{x:.1%}")
+        
+        # 영향 요인과 중요도 결합
+        display_df['영향 요인 1'] = display_df.apply(
+            lambda x: f"{x['영향 요인 1']} ({x['중요도 1']:.1f}%)", axis=1)
+        display_df['영향 요인 2'] = display_df.apply(
+            lambda x: f"{x['영향 요인 2']} ({x['중요도 2']:.1f}%)", axis=1)
+        display_df['영향 요인 3'] = display_df.apply(
+            lambda x: f"{x['영향 요인 3']} ({x['중요도 3']:.1f}%)", axis=1)
+        
+        # 불필요한 중요도 컬럼 제거
+        display_df = display_df.drop(['중요도 1', '중요도 2', '중요도 3'], axis=1)
+        
+        # 필터링된 결과 개수 표시
+        st.write(f"총 {len(display_df)}명의 고객이 선택되었습니다.")
+        
+        # 참고사항 표시
+        st.info("""
+        **참고사항:**
+        - **증가**: 해당 특성이 고객의 이탈 확률을 높이는 방향으로 작용합니다.
+          - 예: "마지막 주문 후 경과일 (증가)"는 경과일이 길수록 이탈 확률이 높아짐
+        - **감소**: 해당 특성이 고객의 이탈 확률을 낮추는 방향으로 작용합니다.
+          - 예: "만족도 점수 (감소)"는 만족도가 높을수록 이탈 확률이 낮아짐
+        - 괄호 안의 숫자는 해당 특성이 이탈 확률에 미치는 영향의 크기를 나타냅니다.
+        """)
         
         # 테이블 스타일 설정
         st.dataframe(
@@ -44,14 +100,11 @@ def show_customer_churn_analysis():
             use_container_width=True,
             hide_index=True,
             column_config={
-                "고객 ID": st.column_config.TextColumn("고객 ID", width="medium"),
+                "고객 ID": st.column_config.TextColumn("고객 ID", width="small"),
                 "이탈 위험도": st.column_config.TextColumn("이탈 위험도", width="small"),
                 "영향 요인 1": st.column_config.TextColumn("영향 요인 1", width="medium"),
-                "중요도 1": st.column_config.TextColumn("중요도 1", width="small"),
                 "영향 요인 2": st.column_config.TextColumn("영향 요인 2", width="medium"),
-                "중요도 2": st.column_config.TextColumn("중요도 2", width="small"),
-                "영향 요인 3": st.column_config.TextColumn("영향 요인 3", width="medium"),
-                "중요도 3": st.column_config.TextColumn("중요도 3", width="small")
+                "영향 요인 3": st.column_config.TextColumn("영향 요인 3", width="medium")
             }
         )
         

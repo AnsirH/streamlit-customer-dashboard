@@ -3,6 +3,8 @@ import numpy as np
 import os
 import joblib
 from sklearn.preprocessing import LabelEncoder
+import pickle
+import shap
 
 class ChurnPredictor:
     """고객 이탈 예측을 위한 모델 클래스"""
@@ -241,24 +243,49 @@ def analyze_customers():
         # 예측 수행
         predictions, probabilities = predictor.predict(df)
         
-        # 특성 중요도 가져오기
-        feature_importance = predictor.get_feature_importance()
+        # SHAP 값 계산
+        explainer = shap.TreeExplainer(predictor.model)
+        shap_values = explainer.shap_values(X)
         
-        # 상위 특성 선택 (안전하게 처리)
-        top_features = sorted(feature_importance.items(), key=lambda x: x[1], reverse=True)
+        # 이탈 확률 예측
+        _, churn_probabilities = predictor.predict(X)
         
         # 결과 데이터프레임 생성
         results = []
-        for idx, row in df.iterrows():
+        for i, (customer_id, prob) in enumerate(zip(df['CustomerID'], churn_probabilities)):
+            # 해당 고객의 SHAP 값 추출
+            customer_shap = shap_values[i]
+            
+            # 모든 특성의 SHAP 값 계산 (부호 유지)
+            shap_values_with_sign = [(feature, shap) 
+                                   for feature, shap in zip(feature_columns, customer_shap)]
+            
+            # 모든 특성의 SHAP 값 절대값 합계 계산
+            total_abs_shap = sum(abs(shap) for _, shap in shap_values_with_sign)
+            
+            # SHAP 값 기준으로 정렬 (절대값 기준)
+            sorted_features = sorted(shap_values_with_sign, 
+                                   key=lambda x: abs(x[1]), reverse=True)[:3]
+            
+            # 정규화된 중요도 계산 (전체 특성 대비 비율)
+            normalized_importances = [(feature, shap / total_abs_shap * 100) 
+                                   for feature, shap in sorted_features]
+            
+            # 방향성 정보를 포함한 특성 이름 생성
+            feature_names = []
+            for feature, importance in normalized_importances:
+                direction = "증가" if importance > 0 else "감소"
+                feature_names.append(f"{feature} ({direction})")
+            
             result = {
-                'CustomerID': row['CustomerID'],
-                'Churn Risk': probabilities[idx],
-                'Top Feature 1': top_features[0][0] if len(top_features) > 0 else 'Unknown',
-                'Importance 1': top_features[0][1] if len(top_features) > 0 else 0.0,
-                'Top Feature 2': top_features[1][0] if len(top_features) > 1 else 'Unknown',
-                'Importance 2': top_features[1][1] if len(top_features) > 1 else 0.0,
-                'Top Feature 3': top_features[2][0] if len(top_features) > 2 else 'Unknown',
-                'Importance 3': top_features[2][1] if len(top_features) > 2 else 0.0
+                'CustomerID': customer_id,
+                'Churn Risk': prob,
+                'Top Feature 1': feature_names[0],
+                'Importance 1': abs(normalized_importances[0][1]),
+                'Top Feature 2': feature_names[1],
+                'Importance 2': abs(normalized_importances[1][1]),
+                'Top Feature 3': feature_names[2],
+                'Importance 3': abs(normalized_importances[2][1])
             }
             results.append(result)
         
