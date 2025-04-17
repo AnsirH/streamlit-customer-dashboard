@@ -120,76 +120,122 @@ class ChurnPredictor:
             categorical_cols = list(encoded_features_dict.keys())
             st.write(f"🔍 [전처리]: 원핫인코딩 대상 범주형 변수: {categorical_cols}")
             
-            # 6. 새 결과 데이터프레임 생성 (모델이 필요로 하는 모든 특성을 포함하게 됨)
+            # 6. 각 범주형 변수별 가능한 값 목록 추출
+            category_values = {}
+            for prefix, features in encoded_features_dict.items():
+                category_values[prefix] = [f.split('_', 1)[1] for f in features]
+                st.write(f"🔍 [전처리]: '{prefix}'의 가능한 값 ({len(category_values[prefix])}개): {category_values[prefix]}")
+            
+            # 7. 새 결과 데이터프레임 생성 (모델이 필요로 하는 모든 특성을 포함하게 됨)
             result_df = pd.DataFrame(index=data.index)
             
-            # 7. 모델이 필요로 하는 특성 목록을 순회하며 채우기
+            # 8. 미리 모든 원핫인코딩 컬럼을 0으로 초기화
             for feature in model_features:
-                # 7.1 원핫인코딩된 특성인지 확인 (형태: 'prefix_value')
-                if '_' in feature:
-                    prefix, value = feature.split('_', 1)
-                    
-                    # 7.2 해당 접두사가 범주형 변수로 식별되었는지 확인
-                    if prefix in categorical_cols and prefix in data.columns:
-                        # 7.3 현재 입력 데이터의 해당 컬럼 값이 이 값과 일치하는지 확인
-                        original_val = data[prefix].iloc[0]  # 첫 번째 행의 값
+                result_df[feature] = 0
+            
+            # 9. 범주형 변수 처리 및 임의 값 매핑 기록
+            fallback_mappings = {}  # 매핑 정보 저장
+            
+            # 10. 각 범주형 변수 처리
+            for prefix in categorical_cols:
+                if prefix in data.columns:
+                    # 10.1 입력 데이터에서 해당 컬럼 값 가져오기
+                    for idx, row in data.iterrows():
+                        input_value = str(row[prefix]).strip()
                         
-                        # 7.4 값이 일치하면 1, 아니면 0으로 설정
-                        if str(original_val).strip() == str(value).strip():
-                            result_df[feature] = 1
+                        # 10.2 해당 값에 대한 원핫인코딩 컬럼 이름 생성
+                        expected_col = f"{prefix}_{input_value}"
+                        
+                        # 10.3 해당 컬럼이 모델 특성에 존재하는지 확인
+                        col_exists = expected_col in model_features
+                        
+                        if col_exists:
+                            # 10.4 존재하는 경우 해당 컬럼을 1로 설정
+                            result_df.loc[idx, expected_col] = 1
                         else:
-                            result_df[feature] = 0
-                    else:
-                        # 범주형 변수가 입력에 없으면 0으로 설정
-                        result_df[feature] = 0
-                else:
-                    # 7.5 원핫인코딩되지 않은 일반 특성 처리
-                    if feature in data.columns:
-                        result_df[feature] = data[feature]
-                    else:
-                        # 특성이 입력에 없으면 0으로 채움
-                        result_df[feature] = 0
+                            # 10.5 존재하지 않는 경우 대체 전략 적용
+                            st.warning(f"⚠️ '{prefix}'의 값 '{input_value}'에 대한 원핫인코딩 컬럼이 모델에 없습니다.")
+                            
+                            if prefix in category_values and category_values[prefix]:
+                                # 10.6 유사도 기반 매핑 시도
+                                possible_values = category_values[prefix]
+                                
+                                # 10.6.1 방법 1: 정확히 대소문자만 다른 경우
+                                case_insensitive_match = next((val for val in possible_values 
+                                                       if val.lower() == input_value.lower()), None)
+                                
+                                if case_insensitive_match:
+                                    # 대소문자 차이만 있는 매칭 사용
+                                    fallback_col = f"{prefix}_{case_insensitive_match}"
+                                    result_df.loc[idx, fallback_col] = 1
+                                    fallback_mappings[input_value] = case_insensitive_match
+                                    st.write(f"✓ 대소문자 무시 매핑: '{input_value}' → '{case_insensitive_match}'")
+                                else:
+                                    # 10.6.2 방법 2: 첫 번째 값 사용 (기본값)
+                                    fallback_value = possible_values[0]  # 첫 번째 값을 기본값으로 사용
+                                    fallback_col = f"{prefix}_{fallback_value}"
+                                    result_df.loc[idx, fallback_col] = 1
+                                    fallback_mappings[input_value] = fallback_value
+                                    st.write(f"✓ 기본값 매핑: '{input_value}' → '{fallback_value}' (첫 번째 값)")
+                            else:
+                                st.error(f"⚠️ '{prefix}'에 대한 가능한 값 목록을 찾을 수 없습니다!")
             
-            # 8. 결과 확인
-            st.write(f"🔍 [전처리]: 처리된 데이터 크기: {result_df.shape}")
+            # 11. 범주형이 아닌 일반 특성 처리
+            for feature in model_features:
+                # 원핫인코딩된 특성이 아닌 경우만 처리 (이미 위에서 처리되지 않은 경우)
+                if '_' not in feature and feature in data.columns:
+                    result_df[feature] = data[feature]
             
-            # 9. 입력 데이터가 1개 레코드라면 범주형 변수별 설정 값 출력
-            if len(data) == 1:
-                st.write("🔍 [전처리]: 범주형 변수별 설정 값")
-                for prefix in categorical_cols:
-                    if prefix in data.columns:
-                        input_value = data[prefix].iloc[0]
-                        ohe_cols = [f for f in result_df.columns if f.startswith(f"{prefix}_")]
-                        active_cols = [f for f in ohe_cols if result_df[f].iloc[0] == 1]
-                        
-                        st.write(f"  - {prefix}: 입력값 '{input_value}' → 활성화 컬럼: {active_cols}")
-                        
-                        # 경고: 활성화된 컬럼이 없는 경우 (값이 모델에 없는 경우)
-                        if not active_cols:
-                            st.warning(f"⚠️ '{prefix}'의 값 '{input_value}'에 대한 원핫인코딩 컬럼이 활성화되지 않았습니다!")
-                            st.write(f"  - 가능한 값: {[c.split('_', 1)[1] for c in ohe_cols]}")
+            # 12. 디버깅: 대체 매핑 정보 출력
+            if fallback_mappings:
+                st.write("### ⚠️ 원핫인코딩 값 대체 정보")
+                for original, replacement in fallback_mappings.items():
+                    st.write(f"- '{original}' → '{replacement}'")
             
-            # 10. 모델 필요 특성과 완전히 일치하는지 확인
+            # 13. 결과 데이터 검증
             if set(result_df.columns) != set(model_features):
                 st.error("⚠️ 생성된 특성이 모델 특성과 일치하지 않습니다!")
                 missing = set(model_features) - set(result_df.columns)
                 extra = set(result_df.columns) - set(model_features)
                 
                 if missing:
-                    st.write(f"🔍 [전처리]: 누락된 특성: {list(missing)}")
+                    st.write(f"- 누락된 특성: {list(missing)}")
                 if extra:
-                    st.write(f"🔍 [전처리]: 추가된 특성: {list(extra)}")
-                    
-                # 누락된 특성에 0 채우기
+                    st.write(f"- 추가된 특성: {list(extra)}")
+                    result_df = result_df.drop(columns=list(extra))
+                
+                # 누락된 특성 추가
                 for feat in missing:
                     result_df[feat] = 0
-                    
-                # 추가된 특성 제거
-                if extra:
-                    result_df = result_df.drop(columns=list(extra))
             
-            # 11. 모델 특성 순서 맞추기
+            # 14. 모델 특성 순서에 맞게 재정렬
             result_df = result_df[model_features]
+            
+            # 15. 각 범주형 변수별 활성화된 컬럼 확인
+            if len(data) == 1:  # 단일 레코드인 경우
+                for prefix in categorical_cols:
+                    if prefix in data.columns:
+                        # 현재 값 확인
+                        input_value = data[prefix].iloc[0]
+                        
+                        # 이 범주형 변수에 해당하는 모든 원핫인코딩 컬럼
+                        ohe_cols = [col for col in result_df.columns if col.startswith(f"{prefix}_")]
+                        
+                        # 활성화된 컬럼 (값이 1인 컬럼)
+                        active_cols = [col for col in ohe_cols if result_df[col].iloc[0] == 1]
+                        
+                        if active_cols:
+                            # 활성화된 컬럼이 있는 경우
+                            active_values = [col.split('_', 1)[1] for col in active_cols]
+                            st.write(f"✓ '{prefix}': 입력값 '{input_value}' → 활성화된 값: {active_values}")
+                        else:
+                            # 활성화된 컬럼이 없는 경우 (중요한 오류!)
+                            st.error(f"⚠️ '{prefix}'에 대해 활성화된 원핫인코딩 컬럼이 없습니다!")
+                            st.write(f"  - 원본 값: '{input_value}'")
+                            st.write(f"  - 가능한 값: {category_values.get(prefix, [])}")
+            
+            # 16. 전처리 완료
+            st.write(f"🔍 [전처리]: 데이터 처리 완료, 최종 크기: {result_df.shape}")
             
             return result_df
             
