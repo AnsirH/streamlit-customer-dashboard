@@ -87,6 +87,12 @@ if uploaded_file:
     df["이탈확률"] = y_proba
     df["위험군"] = df["이탈확률"].apply(classify_risk)
 
+    # 복원된 한글 컬럼 데이터 생성
+    df_recovered = reverse_one_hot_columns(df_encoded)
+    df_recovered["고객ID"] = df["고객ID"]
+    df_recovered["이탈확률"] = df["이탈확률"]
+    df_recovered["위험군"] = df["위험군"]
+
     # 위험군별 고객 ID (상위 10개씩)
     st.subheader("📌 위험군별 고객 ID (상위 10개)")
     for group in ["초고위험군", "고위험군", "주의단계", "관찰단계"]:
@@ -94,71 +100,61 @@ if uploaded_file:
         top_ids = df[df["위험군"] == group].nlargest(10, "이탈확률")["고객ID"].tolist()
         st.write(top_ids)
 
-    st.success("✅ 고객 ID 부여 및 군별 분류까지 완료되었습니다.")
+    st.subheader("👤 고객 ID 선택")
+    selected_id = st.selectbox("고객 ID 선택", df_recovered["고객ID"].unique())
+    selected_row = df_recovered[df_recovered["고객ID"] == selected_id].iloc[0]
 
-    # 고객 ID 선택 및 입력 UI
-    st.header("4️⃣ 고객 ID 기반 시뮬레이션")
-    selected_id = st.selectbox("분석할 고객ID 선택", df.index.astype(str))
-    selected_row = df.loc[int(selected_id)]
+    # 게이지 시각화
+    st.subheader("📈 이탈 확률 게이지")
+    prob_pct = float(selected_row["이탈확률"] * 100)
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=prob_pct,
+        number={'suffix': '%'},
+        title={"text": "이탈 가능성 (%)"},
+        gauge={
+            'axis': {'range': [0, 100]},
+            'bar': {'color': 'darkblue'},
+            'steps': [
+                {'range': [0, 30], 'color': 'green'},
+                {'range': [30, 50], 'color': 'yellowgreen'},
+                {'range': [50, 70], 'color': 'yellow'},
+                {'range': [70, 90], 'color': 'orange'},
+                {'range': [90, 100], 'color': 'red'}
+            ]
+        }
+    ))
+    st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("🛠 고객 데이터 튜닝")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        tenure = st.number_input("이용 기간 (개월)", value=int(selected_row["Tenure"]))
-        hour = st.number_input("앱 사용 시간", value=float(selected_row["HourSpendOnApp"]))
-    with col2:
-        satisfaction = st.slider("만족도 점수 (1~5)", 1, 5, int(selected_row["SatisfactionScore"]))
-        order_count = st.number_input("주문 횟수", value=int(selected_row["OrderCount"]))
-    with col3:
-        last_order = st.number_input("마지막 주문 후 경과일", value=int(selected_row["DaySinceLastOrder"]))
-        complain = st.selectbox("불만 제기 여부", ["아니오", "예"], index=int(selected_row["Complain"]))
-
-    col4, col5, col6 = st.columns(3)
-    with col4:
-        gender = st.selectbox("성별", ["Male", "Female"], index=0 if selected_row["Gender"] == "Male" else 1)
-        marital = st.selectbox("결혼 여부", ["Single", "Married"], index=0 if selected_row["MaritalStatus"] == "Single" else 1)
-    with col5:
-        order_cat = st.selectbox("선호 주문 카테고리", df["PreferedOrderCat"].unique(), index=0)
-        login = st.selectbox("선호 로그인 기기", df["PreferredLoginDevice"].unique(), index=0)
-    with col6:
-        pay = st.selectbox("선호 결제 방식", df["PreferredPaymentMode"].unique(), index=0)
-
-    modified = pd.DataFrame([{
-        "Tenure": tenure,
-        "CityTier": selected_row["CityTier"],
-        "WarehouseToHome": selected_row["WarehouseToHome"],
-        "HourSpendOnApp": hour,
-        "NumberOfDeviceRegistered": selected_row["NumberOfDeviceRegistered"],
-        "SatisfactionScore": satisfaction,
-        "NumberOfAddress": selected_row["NumberOfAddress"],
-        "Complain": 1 if complain == "예" else 0,
-        "OrderAmountHikeFromlastYear": selected_row["OrderAmountHikeFromlastYear"],
-        "CouponUsed": selected_row["CouponUsed"],
-        "OrderCount": order_count,
-        "DaySinceLastOrder": last_order,
-        "CashbackAmount": selected_row["CashbackAmount"],
-        "PreferredLoginDevice": login,
-        "PreferredPaymentMode": pay,
-        "Gender": gender,
-        "PreferedOrderCat": order_cat,
-        "MaritalStatus": marital
-    }])
+    # 컬럼값 표시 및 수정 UI
+    st.subheader("⚙ 고객 데이터 튜닝")
+    updated_values = {}
+    for col in df_recovered.columns:
+        if col in ["고객ID", "이탈확률", "위험군"]:
+            continue
+        if df_recovered[col].dtype == object:
+            updated_values[col] = st.selectbox(col, sorted(df_recovered[col].unique()), index=sorted(df_recovered[col].unique()).index(selected_row[col]))
+        else:
+            updated_values[col] = st.number_input(col, value=float(selected_row[col]))
 
     if st.button("변동 예측하기"):
-        df_encoded_mod = pd.get_dummies(modified)
+        df_updated = pd.DataFrame([updated_values])
+        df_updated_encoded = pd.get_dummies(df_updated)
         for col in model_features:
-            if col not in df_encoded_mod.columns:
-                df_encoded_mod[col] = 0
-        df_encoded_mod = df_encoded_mod[model_features]
+            if col not in df_updated_encoded.columns:
+                df_updated_encoded[col] = 0
+        df_updated_encoded = df_updated_encoded[model_features]
 
-        _, new_proba = predictor.predict(df_encoded_mod)
+        _, new_proba = predictor.predict(df_updated_encoded)
         new_pct = float(new_proba[0]) * 100
 
-        fig_new = go.Figure(go.Indicator(
+        st.success(f"변경된 이탈 확률: {new_pct:.2f}%")
+
+        fig2 = go.Figure(go.Indicator(
             mode="gauge+number",
             value=new_pct,
             number={'suffix': '%'},
-            title={"text": "변경 후 이탈 확률"},
+            title={"text": "이탈 가능성 (변경 후)"},
             gauge={
                 'axis': {'range': [0, 100]},
                 'bar': {'color': 'darkblue'},
@@ -171,4 +167,4 @@ if uploaded_file:
                 ]
             }
         ))
-        st.plotly_chart(fig_new, use_container_width=True)
+        st.plotly_chart(fig2, use_container_width=True)
