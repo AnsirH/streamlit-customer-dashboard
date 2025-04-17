@@ -22,7 +22,7 @@ class ChurnPredictor:
         """모델을 로드하고 초기화합니다."""
         self.model = None
         if model_path is None:
-            self.model_path = Path(__file__).parent / "xgb_best_model.pkl"
+            self.model_path = Path(__file__).parent / "xgboost_best_model.pkl"
         else:
             self.model_path = model_path
         self.feature_importance_cache = None  # 특성 중요도 캐시 추가
@@ -204,7 +204,7 @@ class ChurnPredictor:
 # ===============================
 # ✅ 모델 로드 및 예측 함수
 # ===============================
-MODEL_PATH = Path(__file__).parent / "xgb_best_model.pkl"
+MODEL_PATH = Path(__file__).parent / "xgboost_best_model.pkl"
 
 def load_churn_model(model_path: str = None):
     """
@@ -217,7 +217,7 @@ def load_churn_model(model_path: str = None):
         Trained model
     """
     if model_path is None:
-        model_path = Path(__file__).parent / "xgb_best_model.pkl"
+        model_path = Path(__file__).parent / "xgboost_best_model.pkl"
     else:
         model_path = Path(model_path)
         
