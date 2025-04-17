@@ -89,11 +89,23 @@ def main():
     st.sidebar.title("설정")
     show_debug = st.sidebar.checkbox("디버그 정보 표시", value=False)
     
-    # 탭 생성
-    input_tab, result_tab = st.tabs(["고객 데이터 입력", "예측 결과"])
+    # 세션 상태 초기화
+    if 'active_tab' not in st.session_state:
+        st.session_state.active_tab = "input"
     
-    # 고객 데이터 입력 탭
-    with input_tab:
+    # 탭 선택 버튼
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("고객 데이터 입력", use_container_width=True, 
+                     type="primary" if st.session_state.active_tab == "input" else "secondary"):
+            st.session_state.active_tab = "input"
+    with col2:
+        if st.button("예측 결과", use_container_width=True,
+                     type="primary" if st.session_state.active_tab == "result" else "secondary"):
+            st.session_state.active_tab = "result"
+    
+    # 선택된 탭에 따라 내용 표시
+    if st.session_state.active_tab == "input":
         st.header("고객 데이터 입력")
         
         # 입력 필드 생성 (3열로 구성)
@@ -161,27 +173,24 @@ def main():
                     # 예측 수행
                     y_pred, y_proba = predictor.predict(new_customer_data)
                     
-                    # 결과 탭으로 전환
-                    result_tab.update()
-                    
                     # 세션 상태에 결과 저장
                     st.session_state['prediction_result'] = {
                         'prediction': y_pred[0],
                         'probability': y_proba[0],
                         'customer_data': new_customer_data
                     }
+                    
+                    # 결과 탭으로 전환
+                    st.session_state.active_tab = "result"
+                    st.rerun()
                 
-                # 성공 메시지
-                st.success("예측이 완료되었습니다! '예측 결과' 탭에서 결과를 확인하세요.")
-            
             except Exception as e:
                 # 오류 메시지
                 st.error(f"예측 중 오류가 발생했습니다: {str(e)}")
                 if show_debug:
                     st.exception(e)
     
-    # 예측 결과 탭
-    with result_tab:
+    elif st.session_state.active_tab == "result":
         # 예측 결과가 있는 경우에만 표시
         if 'prediction_result' in st.session_state:
             result = st.session_state['prediction_result']
@@ -311,13 +320,19 @@ def main():
                     # 전처리된 데이터 (예시)
                     st.write("### 전처리 후 데이터 (원핫인코딩 적용)")
                     try:
+                        # 예측기 인스턴스 생성
+                        predictor = ChurnPredictor()
                         processed_df = predictor._preprocess_data(customer_data)
                         st.dataframe(processed_df)
-                    except:
-                        st.warning("전처리된 데이터를 표시할 수 없습니다.")
+                    except Exception as e:
+                        st.warning(f"전처리된 데이터를 표시할 수 없습니다: {str(e)}")
         else:
             # 예측 결과가 없는 경우
-            st.info("'고객 데이터 입력' 탭에서 데이터를 입력하고 '예측하기' 버튼을 클릭하세요.")
+            st.info("먼저 '고객 데이터 입력' 탭에서 데이터를 입력하고 '예측하기' 버튼을 클릭하세요.")
+            # 입력 탭으로 돌아가는 버튼
+            if st.button("고객 데이터 입력으로 돌아가기", type="primary"):
+                st.session_state.active_tab = "input"
+                st.rerun()
 
 if __name__ == "__main__":
     main() 
