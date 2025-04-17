@@ -142,39 +142,6 @@ if st.button("🧠 이탈 예측하기"):
             }
         ))
         st.plotly_chart(fig, use_container_width=True)
-
-    #     # 🔽 3️⃣ 예측에 영향을 준 주요 요인
-    #     st.header("3️⃣ 예측에 영향을 준 주요 요인")
-
-        
-    #     # feature importance 가져오기 (컬럼명 포함된 사전 형태)
-    #     importance_dict = predictor.get_feature_importance()
-
-    #     # 상위 5개만 추출
-    #     fi_df = pd.DataFrame(importance_dict.items(), columns=["Feature", "Importance"]) \
-    #              .sort_values("Importance", ascending=False).head(5)
-
-    #     # 바 차트 시각화
-    #     fig_bar = go.Figure(go.Bar(
-    #         x=fi_df["Feature"],
-    #         y=fi_df["Importance"],
-    #         marker_color='skyblue'
-    #     ))
-    #     fig_bar.update_layout(
-    #         xaxis_title="입력 변수",
-    #         yaxis_title="중요도",
-    #         title="📊 상위 5개 중요 변수 (입력값 기준)",
-    #         height=400
-    #     )
-    #     st.plotly_chart(fig_bar, use_container_width=True)
-
-    #     # 요약 문장 자동 생성
-    #     st.markdown("📌 **예측 해석 요약:**")
-    #     for i, row in fi_df.iterrows():
-    #         st.markdown(f"- `{row['Feature']}` 변수의 영향도가 **{row['Importance']:.2f}**로 높게 나타났습니다.")
-
-    # except Exception as e:
-    #     st.error(f"❌ 예측 실패: {str(e)}")
         
         # 🔽 3️⃣ 예측에 영향을 준 주요 요인
         st.header("3️⃣ 예측에 영향을 준 주요 요인")
