@@ -23,101 +23,25 @@ class ChurnPredictor:
         self.model = None
         self.feature_importance_cache = {}
         self.model_path = Path(__file__).parent / "xgb_best_model.pkl"
-        st.write(f"DEBUG: 모델 경로: {self.model_path}")
-        st.write(f"DEBUG: 모델 파일 존재: {self.model_path.exists()}")
-        
-        # 원본 데이터셋 확인 시도
-        excel_path = Path(__file__).parent / "E Commerce Dataset2.xlsx"
-        if excel_path.exists():
-            try:
-                df = pd.read_excel(excel_path)
-                st.write("DEBUG: 원본 데이터셋 컬럼명:", df.columns.tolist()[:10])  # 처음 10개만 표시
-            except Exception as e:
-                st.write(f"DEBUG: 원본 데이터셋 읽기 실패: {str(e)}")
-        
         try:
             self.load_model()
-            st.write("DEBUG: 모델 로드 성공")
         except Exception as e:
             logger.error(f"모델 로드 오류: {str(e)}")
-            st.error(f"모델 로드 중 오류가 발생했습니다: {str(e)}")
+            st.error(f"모델 로드 중 오류가 발생했습니다.")
     
     def load_model(self):
         """모델 파일을 로드합니다."""
         try:
             if not self.model_path.exists():
                 logger.error(f"모델 파일을 찾을 수 없습니다: {self.model_path}")
-                st.error(f"모델 파일을 찾을 수 없습니다: {self.model_path}")
                 return False
             
-            st.write(f"DEBUG: 모델 파일 크기: {os.path.getsize(self.model_path)} 바이트")
             self.model = joblib.load(self.model_path)
-            
-            # 모델 정보 출력
-            st.write(f"DEBUG: 모델 타입: {type(self.model)}")
-            st.write(f"DEBUG: 모델 사용 가능 메서드: {dir(self.model)[:5]}...")
-            
-            if hasattr(self.model, 'feature_importances_'):
-                st.write(f"DEBUG: 특성 중요도 수: {len(self.model.feature_importances_)}")
-            
             logger.info(f"모델 로드 성공: {self.model_path}")
             return True
         except Exception as e:
             logger.error(f"모델 로드 실패: {str(e)}")
-            st.error(f"모델 로드 실패: {str(e)}")
-            import traceback
-            st.code(traceback.format_exc())
             return False
-    
-    def _default_prediction(self):
-        """기본 예측값 반환"""
-        return np.array([0]), np.array([0.5])
-    
-    def _test_prediction(self, input_df):
-        """테스트용 예측 함수 - 실제 모델 없이 입력값에 따라 다른 예측 반환"""
-        # 데이터 전처리 (컬럼 이름 일치화)
-        processed_df = self._preprocess_data(input_df)
-        
-        # 간단한 규칙 기반 예측 (실제 모델 사용하지 않음)
-        if 'Tenure' in processed_df.columns and 'SatisfactionScore' in processed_df.columns:
-            tenure = processed_df['Tenure'].iloc[0]
-            satisfaction = processed_df['SatisfactionScore'].iloc[0]
-            
-            # 추가 피처들도 확인
-            hour_spend = processed_df.get('HourSpendOnApp', pd.Series([0])).iloc[0]
-            days_since_order = processed_df.get('DaySinceLastOrder', pd.Series([0])).iloc[0]
-            complain = processed_df.get('Complain', pd.Series([0])).iloc[0]
-            
-            # 간단한 규칙: 거래기간 길고 만족도 높으면 이탈 확률 낮음
-            base_prob = 0.5
-            tenure_effect = min(0.3, tenure / 100.0)  # 최대 0.3 감소
-            satisfaction_effect = min(0.2, satisfaction / 25.0)  # 최대 0.2 감소
-            
-            # 추가 요소 반영
-            app_usage_effect = min(0.1, hour_spend / 20.0)  # 앱 사용시간 많을수록 이탈 확률 감소
-            recency_effect = min(0.2, days_since_order / 50.0)  # 최근 주문 일수가 길수록 이탈 확률 증가
-            complain_effect = 0.2 if complain == 1 else 0  # 불만 제기 있으면 이탈 확률 증가
-            
-            # 최종 계산
-            churn_prob = base_prob - tenure_effect - satisfaction_effect - app_usage_effect + recency_effect + complain_effect
-            
-            # 확률 범위 제한
-            churn_prob = max(0.1, min(0.9, churn_prob))
-            
-            st.write(f"""DEBUG: 테스트 예측
-            - 거래기간(Tenure): {tenure}, 효과: -{tenure_effect:.2f}
-            - 만족도(SatisfactionScore): {satisfaction}, 효과: -{satisfaction_effect:.2f}
-            - 앱사용시간(HourSpendOnApp): {hour_spend}, 효과: -{app_usage_effect:.2f}
-            - 마지막주문후경과일(DaySinceLastOrder): {days_since_order}, 효과: +{recency_effect:.2f}
-            - 불만제기(Complain): {complain}, 효과: +{complain_effect:.2f}
-            - 최종 이탈확률: {churn_prob:.2f}
-            """)
-            
-            return np.array([1 if churn_prob > 0.5 else 0]), np.array([churn_prob])
-        
-        # 기본값 반환
-        st.warning("필수 컬럼(Tenure, SatisfactionScore)을 찾을 수 없어 기본값 반환")
-        return np.array([0]), np.array([0.5])
     
     def predict(self, input_df):
         """
@@ -130,23 +54,45 @@ class ChurnPredictor:
             tuple: (예측 클래스, 이탈 확률)
         """
         try:
-            # 원본 데이터 확인
-            st.write("DEBUG: 원본 입력 데이터:")
-            st.write(input_df)
+            # 모델이 없으면 로드 시도
+            if self.model is None:
+                self.load_model()
+                
+            # 모델 로드 실패 시 기본값 반환
+            if self.model is None:
+                return self._default_prediction()
             
-            # 테스트 모드 사용 - 실제 모델 대신 테스트 예측 사용
-            st.write("DEBUG: 테스트 모드로 예측 수행")
-            result = self._test_prediction(input_df)
+            # 데이터 전처리
+            processed_df = self._preprocess_data(input_df)
             
-            # 디버깅을 위한 결과 출력
-            st.write(f"DEBUG: 예측 결과 - 클래스: {result[0][0]}, 확률: {result[1][0]}")
-            
-            return result
+            # 예측 수행
+            try:
+                y_pred = self.model.predict(processed_df)
+                y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+                
+                # 예측 결과 확인
+                if len(y_proba) == 0:
+                    return self._default_prediction()
+                
+                # 성공적으로 예측한 경우 특성 중요도 계산
+                try:
+                    self._compute_feature_importance(processed_df)
+                except Exception as e:
+                    # 특성 중요도 계산 실패해도 예측 결과는 반환
+                    pass
+                
+                return y_pred, y_proba
+            except Exception as e:
+                logger.error(f"예측 오류: {str(e)}")
+                return self._default_prediction()
                 
         except Exception as e:
             logger.error(f"예측 처리 중 오류: {str(e)}")
-            st.error(f"예측 처리 중 오류: {str(e)}")
             return self._default_prediction()
+    
+    def _default_prediction(self):
+        """기본 예측값 반환"""
+        return np.array([0]), np.array([0.5])
     
     def _preprocess_data(self, input_df):
         """
@@ -183,9 +129,6 @@ class ChurnPredictor:
             'cashback_amount': 'CashbackAmount'
         }
         
-        # DEBUG: 변환 전 컬럼 확인
-        st.write("DEBUG: 전처리 전 컬럼 -", df.columns.tolist())
-        
         # 컬럼 이름 변환
         renamed_columns = {}
         for col in df.columns:
@@ -195,38 +138,32 @@ class ChurnPredictor:
         if renamed_columns:
             df = df.rename(columns=renamed_columns)
             
-        # DEBUG: 변환 후 컬럼 확인
-        st.write("DEBUG: 전처리 후 컬럼 -", df.columns.tolist())
-            
         # CustomerID 제거 (예측에 사용되지 않음)
-        if 'CustomerID' in df.columns:
-            df = df.drop('CustomerID', axis=1)
+        columns_to_remove = ['CustomerID', 'customer_id', 'cust_id', 'id']
+        for col in columns_to_remove:
+            if col in df.columns:
+                df = df.drop(col, axis=1)
         
         # complaint_status/Complain 불리언 변환 (예/아니오 -> 0/1)
         if 'Complain' in df.columns and isinstance(df['Complain'].iloc[0], str):
             df['Complain'] = df['Complain'].apply(lambda x: 1 if x == '예' else 0)
-        
+            
         return df
     
     def _compute_feature_importance(self, input_df):
         """모델의 feature_importances_ 속성을 사용하여 특성 중요도를 계산합니다."""
         if self.model is None:
-            st.write("DEBUG: 모델이 없어 특성 중요도 계산 불가")
             return
             
         try:
-            # SHAP 사용하지 않고 직접 feature_importances_ 사용
-            st.write("DEBUG: feature_importances_ 속성 확인")
+            # feature_importances_ 속성 사용
             if hasattr(self.model, 'feature_importances_'):
-                st.write("DEBUG: feature_importances_ 속성 있음")
                 importance_dict = {}
                 for i, col in enumerate(input_df.columns):
                     if i < len(self.model.feature_importances_):
                         importance_dict[col] = self.model.feature_importances_[i]
                 self.feature_importance_cache = importance_dict
-                st.write(f"DEBUG: 특성 중요도 계산 결과: {importance_dict}")
             else:
-                st.write("DEBUG: feature_importances_ 속성 없음, 기본값 사용")
                 # 기본 중요도 설정
                 self.feature_importance_cache = {
                     'Tenure': 0.25,
@@ -237,7 +174,6 @@ class ChurnPredictor:
                     'Complain': 0.08
                 }
         except Exception as e:
-            st.write(f"DEBUG: 특성 중요도 계산 중 오류: {str(e)}")
             # 모든 방법 실패 시 기본 중요도 사용
             self.feature_importance_cache = {
                 'Tenure': 0.25,

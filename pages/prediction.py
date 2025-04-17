@@ -6,58 +6,41 @@ from components.header import show_header
 from components.animations import add_page_transition
 from models.churn_model import ChurnPredictor
 
+# 캐시된 모델 로딩
+@st.cache_resource
+def get_predictor():
+    return ChurnPredictor()
+
 # 게이지 차트 생성
-def create_churn_gauge(value):
+def create_churn_gauge(value: float) -> go.Figure:
     fig = go.Figure(go.Indicator(
-        mode = "gauge+number",
-        value = value * 100,
-        domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': "이탈 가능성 (%)"},
-        gauge = {
-            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
-            'bar': {'color': "darkblue"},
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "gray",
+        mode="gauge+number",
+        value=value * 100,
+        title={"text": "이탈 가능성 (%)"},
+        gauge={
+            'axis': {'range': [0, 100]},
             'steps': [
                 {'range': [0, 30], 'color': 'green'},
                 {'range': [30, 70], 'color': 'yellow'},
                 {'range': [70, 100], 'color': 'red'}
             ],
-            'threshold': {
-                'line': {'color': "red", 'width': 4},
-                'thickness': 0.75,
-                'value': value * 100
-            }
+            'bar': {'color': 'darkblue'},
+            'threshold': {'line': {'color': 'red', 'width': 4}, 'value': value * 100}
         }
     ))
-    
-    fig.update_layout(
-        height=300,
-        margin=dict(l=20, r=20, t=50, b=20),
-    )
-    
+    fig.update_layout(height=300, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
 def show():
-    # 디버그: 함수 시작
-    st.write("DEBUG: 함수 시작")
-    
     # 애니메이션 적용
     add_page_transition()
-    
+
     # 헤더 표시
     show_header()
-    
-    # 디버그: 헤더 표시 후
-    st.write("DEBUG: 헤더 표시 완료")
     
     # 앱 시작
     st.title("고객 이탈 예측")
     st.write("고객 정보를 입력하여 이탈 가능성을 예측해보세요.")
-    
-    # 디버그: 제목 표시 후
-    st.write("DEBUG: 제목 및 설명 표시 완료")
 
     # 입력 컬럼 정의 (+ CustomerID 추가, Churn 제외)
     columns = [
@@ -81,9 +64,6 @@ def show():
         'DaySinceLastOrder',           # 마지막 주문 후 경과일
         'CashbackAmount'               # 캐시백 금액
     ]
-    
-    # 디버그: 컬럼 정의 후
-    st.write("DEBUG: 컬럼 정의 완료")
 
     # 필수 입력 필드 지정 (나머지는 선택 사항)
     required_columns = [
@@ -185,9 +165,6 @@ def show():
     """, unsafe_allow_html=True)
 
     st.markdown("**참고:** 빨간색 별표(\*) 표시가 있는 필드는 필수 입력 사항입니다.")
-    
-    # 디버그: 필수 필드 스타일 적용 후
-    st.write("DEBUG: 필수 필드 스타일 적용 완료")
 
     # 입력값을 저장할 딕셔너리
     input_data = {}
@@ -207,9 +184,6 @@ def show():
 
     # 탭 생성
     tab1, tab2 = st.tabs(["필수 입력 필드", "선택 입력 필드"])
-    
-    # 디버그: 탭 생성 후
-    st.write("DEBUG: 탭 생성 완료")
 
     with tab1:
         # 필수 입력 필드 그리드
@@ -299,7 +273,7 @@ def show():
                                     index=0 if default_values.get(column) == '아니오' else 1,
                                     key=f"input_{column}"
                                 )
-                                input_data[column] = 1 if selected == '예' else 0
+                                input_data[column] = selected  # 문자열 '예'/'아니오' 그대로 유지
                             else:
                                 input_data[column] = st.selectbox(
                                     "",  # 레이블은 위에서 이미 표시
@@ -387,7 +361,7 @@ def show():
                                     index=0 if default_values.get(column) == '아니오' else 1,
                                     key=f"input_{column}"
                                 )
-                                input_data[column] = 1 if selected == '예' else 0
+                                input_data[column] = selected  # 문자열 '예'/'아니오' 그대로 유지
                             else:
                                 input_data[column] = st.selectbox(
                                     korean_name,
@@ -402,15 +376,9 @@ def show():
 
     with col2:
         predict_button = st.button("이탈 예측하기", use_container_width=True, type="primary")
-        
-    # 디버그: 예측 버튼 생성 후
-    st.write("DEBUG: 예측 버튼 생성 완료")
 
     # 예측 결과 표시
     if predict_button:
-        # 디버그: 예측 버튼 클릭
-        st.write("DEBUG: 예측 버튼 클릭됨")
-        
         # 필수 필드 검증
         all_required_filled = all(required_fields_filled.values())
         
@@ -418,50 +386,35 @@ def show():
             # 필수 입력 필드 미입력 시 경고 표시
             missing_fields = [column_korean_names.get(col, col) for col, filled in required_fields_filled.items() if not filled]
             st.error(f"다음 필수 입력 항목을 입력해주세요: {', '.join(missing_fields)}")
-            # 디버그: 필수 필드 검증 실패
-            st.write("DEBUG: 필수 필드 검증 실패")
         else:
-            # 디버그: 필수 필드 검증 성공
-            st.write("DEBUG: 필수 필드 검증 성공, 예측 시작")
-            
             # 로딩 표시
             with st.spinner("예측 중..."):
                 try:
                     # 입력 데이터를 DataFrame으로 변환
                     input_df = pd.DataFrame([input_data])
-                    st.write("DEBUG: 입력 데이터 DataFrame 변환 완료")
                     
                     # 고객 ID 표시
                     st.markdown(f"### 고객 ID: {input_data['CustomerID']}")
                     
-                    # 디버그: ChurnPredictor 로드 시작
-                    st.write("DEBUG: ChurnPredictor 로드 시작")
-                    
                     # 이탈 예측 모델 로드 및 예측
                     predictor = ChurnPredictor()
-                    st.write("DEBUG: ChurnPredictor 인스턴스 생성 완료")
                     
                     _, y_proba = predictor.predict(input_df)
-                    st.write("DEBUG: 예측 완료")
                     
                     prob_value = y_proba[0]  # 이탈 확률
-                    st.write(f"DEBUG: 예측된 확률 값: {prob_value}")
 
                     # 결과 표시
                     st.markdown("---")
                     st.subheader("예측 결과")
                     
                     col1, col2 = st.columns(2)
-                    st.write("DEBUG: 결과 표시 컬럼 생성 완료")
                     
                     with col1:
-                        st.write("DEBUG: 게이지 차트 생성 시작")
                         # 이탈 확률 게이지
                         st.plotly_chart(
                             create_churn_gauge(prob_value),
                             use_container_width=True
                         )
-                        st.write("DEBUG: 게이지 차트 생성 완료")
                     
                     with col2:
                         # 위험도 수준
@@ -545,17 +498,12 @@ def show():
                     # 요인별 설명
                     for name, impact, desc in weighted_factors:
                         st.markdown(f"**{name}**: {desc}")
-                    
+                        
                 except Exception as e:
                     st.error(f"예측 중 오류가 발생했습니다: {str(e)}")
-                    # 디버그: 예측 중 오류 발생
-                    st.write(f"DEBUG: 예측 중 오류 발생 - {str(e)}")
                     import traceback
                     st.write("상세 오류:")
                     st.code(traceback.format_exc())
-
-    # 디버그: 함수 종료
-    st.write("DEBUG: 함수 종료")
 
 # 메인 함수 호출이 필요하면 추가
 if __name__ == "__main__":
