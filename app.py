@@ -16,9 +16,12 @@ add_page_transition()
 st.sidebar.title("메뉴")
 
 # 페이지 이동 버튼
-st.sidebar.page_link("pages/1_고객분석.py", label="고객분석", icon="📊")
-st.sidebar.page_link("pages/2_예측.py", label="예측", icon="🔮")
-st.sidebar.page_link("pages/3_전체_데이터.py", label="전체 데이터", icon="📈")
+if st.sidebar.button("📊 고객분석", use_container_width=True):
+    st.switch_page("pages/1_고객분석.py")
+if st.sidebar.button("🔮 예측", use_container_width=True):
+    st.switch_page("pages/2_예측.py")
+if st.sidebar.button("📈 전체 데이터", use_container_width=True):
+    st.switch_page("pages/3_전체_데이터.py")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("⬇️ **스크롤**")
