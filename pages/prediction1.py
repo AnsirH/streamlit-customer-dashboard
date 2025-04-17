@@ -720,23 +720,42 @@ def show():
                     st.markdown("---")
                     st.subheader("예측 결과")
                     
+                    # 확률 가중치 적용 (선택 사항)
+                    # 모델이 낮은 확률로 예측하는 경향이 있다면 가중치를 적용하여 시각적으로 조정
+                    prob_multiplier = 2.0  # 확률 조정 가중치
+                    adjusted_prob = min(prob_value * prob_multiplier, 1.0)  # 1.0을 초과하지 않도록 함
+                    
+                    # 원본 확률과 조정된 확률 선택
+                    display_prob = prob_value  # 기본값은 원본 확률
+                    
+                    # 확률 조정 옵션
+                    prob_option = st.radio(
+                        "확률 표시 방식", 
+                        ["원본 확률", "조정된 확률 (가중치 적용)"],
+                        horizontal=True
+                    )
+                    
+                    if prob_option == "조정된 확률 (가중치 적용)":
+                        display_prob = adjusted_prob
+                        st.info(f"원본 확률({prob_value*100:.1f}%)에 가중치({prob_multiplier}배)를 적용하여 표시합니다.")
+                    
                     col1, col2 = st.columns(2)
                     
                     with col1:
                         # 이탈 확률 게이지
                         st.plotly_chart(
-                            create_churn_gauge(prob_value),
+                            create_churn_gauge(display_prob),
                             use_container_width=True
                         )
                     
                     with col2:
-                        # 위험도 수준
-                        if prob_value < 0.3:
+                        # 위험도 수준 (조정된 확률 기준)
+                        if display_prob < 0.3:
                             risk_level = "low"
                             risk_text = "낮음"
                             risk_color = "#4CAF50"
                             action_text = "정기적인 마케팅 이메일을 보내고 일반적인 고객 관리를 유지하세요."
-                        elif prob_value < 0.7:
+                        elif display_prob < 0.7:
                             risk_level = "medium"
                             risk_text = "중간"
                             risk_color = "#FFC107"
@@ -750,7 +769,7 @@ def show():
                         # 결과 요약
                         st.markdown(f"""
                         ### 예측 결과 요약
-                        - **이탈 확률**: {prob_value*100:.1f}%
+                        - **이탈 확률**: {display_prob*100:.1f}%
                         - **위험도**: <span style='color:{risk_color};font-weight:bold'>{risk_text}</span>
                         
                         ### 권장 조치
@@ -856,6 +875,82 @@ def show():
                     st.error(f"예측 중 오류가 발생했습니다: {str(e)}")
                     import traceback
                     st.code(traceback.format_exc())
+
+    # 입력 폼 생성 부분 외부에 극단적 테스트 버튼 추가
+    st.markdown("---")
+    if st.button("🔍 극단적 이탈 위험 고객 테스트", help="매우 높은 이탈 위험을 가진 가상의 고객 데이터로 테스트합니다."):
+        # 극단적 이탈 위험을 가진 가상 고객 데이터
+        extreme_data = {
+            'customer_id': f'EXTREME-{np.random.randint(10000, 99999)}',
+            'tenure': 1,  # 매우 짧은 거래기간
+            'preferred_login_device': 'Mobile',
+            'city_tier': 3,
+            'warehouse_to_home': 50,  # 매우 멀리 떨어진 위치
+            'preferred_payment_method': 'Cash on Delivery',
+            'gender': 'Male',
+            'hour_spend_on_app': 0.1,  # 거의 앱 사용 안함
+            'number_of_device_registered': 1,
+            'preferred_order_category': 'Grocery',
+            'satisfaction_score': 1,  # 최저 만족도
+            'marital_status': 'Single',
+            'number_of_address': 1,
+            'complain': '예',  # 불만 있음
+            'order_amount_hike': -20.0,  # 주문액 크게 감소
+            'coupon_used': 0,  # 쿠폰 미사용
+            'order_count': 1,  # 단 1회 주문
+            'days_since_last_order': 120,  # 매우 오래된 마지막 주문
+            'cashback_amount': 0.0  # 캐시백 없음
+        }
+        
+        # 데이터프레임으로 변환
+        extreme_df = pd.DataFrame([extreme_data])
+        
+        # 모델 로드 및 예측
+        with st.spinner("극단적 케이스 예측 중..."):
+            predictor = ChurnPredictor()
+            _, y_proba = predictor.predict(extreme_df)
+            extreme_prob = y_proba[0]
+            
+            # 결과 표시
+            st.markdown("### 극단적 이탈 위험 테스트 결과")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # 이탈 확률 게이지
+                st.plotly_chart(
+                    create_churn_gauge(extreme_prob),
+                    use_container_width=True
+                )
+            
+            with col2:
+                if extreme_prob < 0.05:
+                    st.error("⚠️ 모델이 극단적인 케이스에서도 낮은 확률을 예측합니다!")
+                    st.write("이는 다음과 같은 원인으로 인한 것일 수 있습니다:")
+                    st.write("1. 모델 자체가 이탈 확률을 과소평가하도록 학습되었을 수 있습니다.")
+                    st.write("2. 모델의 입력 특성 매핑에 문제가 있을 수 있습니다.")
+                    st.write("3. 모델이 특정 조합의 특성에 대해 제대로 학습되지 않았을 수 있습니다.")
+                    
+                    # 대안 제시
+                    st.write("**대안:** 원본 확률에 가중치를 적용하여 시각화할 수 있습니다.")
+                    # 가중치 적용된 확률 (최대 1.0)
+                    adjusted_extreme = min(extreme_prob * 5.0, 1.0)
+                    st.success(f"가중치 적용 확률: {adjusted_extreme*100:.1f}%")
+                    
+                    # 조정된 게이지 표시
+                    st.plotly_chart(
+                        create_churn_gauge(adjusted_extreme),
+                        use_container_width=True
+                    )
+                else:
+                    st.success(f"예측된 이탈 확률: {extreme_prob*100:.1f}%")
+                    if extreme_prob > 0.5:
+                        st.write("✅ 모델이 이 극단적인 케이스를 높은 이탈 위험으로 올바르게 예측했습니다.")
+                    else:
+                        st.write("⚠️ 모델이 이 극단적인 케이스에 대해 중간 수준의 이탈 위험을 예측했습니다.")
+            
+            # 입력 데이터 표시
+            with st.expander("극단적 케이스 입력 데이터"):
+                st.dataframe(extreme_df)
 
 # 메인 함수 호출
 if __name__ == "__main__":
