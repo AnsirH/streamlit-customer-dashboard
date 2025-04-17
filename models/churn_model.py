@@ -541,7 +541,68 @@ def load_xgboost_model2():
     except Exception as e:
         raise RuntimeError(f"[❌ 모델 로드 실패] {e}")
 
+##########################
+# 예측 모델 불러오기 
+#########################
 
+import joblib
+from pathlib import Path
+
+def load_xgboost_model2():
+    """xgboost_best_model.pkl 파일을 로드하는 함수"""
+    model_path = Path(__file__).resolve().parent / "xgboost_best_model.pkl"
+    if not model_path.exists():
+        raise FileNotFoundError(f"❌ 모델 파일이 존재하지 않습니다: {model_path}")
+    return joblib.load(model_path)
+
+##########################
+# 예측 모델 클래스
+#########################
+import numpy as np
+import shap
+
+class ChurnPredictor2:
+    """고객 이탈 예측 모델 클래스"""
+
+    def __init__(self, model_path=None, external_model=None):
+        self.model = external_model
+        self.model_path = model_path
+        self.feature_importance_cache = None
+
+    def predict(self, input_df):
+        if self.model is None:
+            return self._default_prediction()
+
+        try:
+            y_pred = self.model.predict(input_df)
+            y_proba = self.model.predict_proba(input_df)[:, 1]
+            return y_pred, y_proba
+        except Exception as e:
+            print(f"[예측 오류] {e}")
+            return self._default_prediction()
+
+    def _default_prediction(self):
+        return np.array([0]), np.array([0.5])
+
+    def get_feature_importance(self):
+        if self.feature_importance_cache is not None:
+            return self.feature_importance_cache
+
+        try:
+            explainer = shap.TreeExplainer(self.model)
+            X_sample = np.zeros((1, len(self.model.get_booster().feature_names)))
+            shap_values = explainer.shap_values(X_sample)
+            importance = np.abs(shap_values).mean(axis=0)
+            feature_names = self.model.get_booster().feature_names
+            self.feature_importance_cache = dict(zip(feature_names, importance))
+            return self.feature_importance_cache
+        except Exception as e:
+            print(f"[SHAP 오류] {e}")
+            return {}
+
+
+
+##########################
 
 
 
