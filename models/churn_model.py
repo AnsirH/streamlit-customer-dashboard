@@ -18,11 +18,11 @@ logger = setup_logger(__name__)
 class ChurnPredictor:
     """고객 이탈 예측을 위한 모델 클래스"""
     
-    def __init__(self):
+    def __init__(self, model_path):
         """모델을 로드하고 초기화합니다."""
         self.model = None
-        self.feature_importance_cache = {}
-        self.model_path = Path(__file__).parent / "xgb_best_model.pkl"
+        self.model_path = model_path
+        self.feature_importance_cache = None  # 특성 중요도 캐시 추가
         try:
             self.load_model()
         except Exception as e:
@@ -150,58 +150,64 @@ class ChurnPredictor:
             
         return df
     
-    def _compute_feature_importance(self, input_df):
-        """모델의 feature_importances_ 속성을 사용하여 특성 중요도를 계산합니다."""
-        if self.model is None:
-            return
-            
+    def _compute_feature_importance(self, input_data):
+        """Calculate feature importance for a prediction."""
         try:
-            # feature_importances_ 속성 사용
-            if hasattr(self.model, 'feature_importances_'):
-                importance_dict = {}
-                for i, col in enumerate(input_df.columns):
-                    if i < len(self.model.feature_importances_):
-                        importance_dict[col] = self.model.feature_importances_[i]
-                self.feature_importance_cache = importance_dict
-            else:
-                # 기본 중요도 설정
-                self.feature_importance_cache = {
-                    'Tenure': 0.25,
-                    'SatisfactionScore': 0.22,
-                    'DaySinceLastOrder': 0.18,
-                    'OrderCount': 0.15,
-                    'HourSpendOnApp': 0.12,
-                    'Complain': 0.08
-                }
+            # 캐시된 특성 중요도가 있으면 사용
+            if self.feature_importance_cache is not None:
+                return self.feature_importance_cache
+                
+            # 이하 기존 로직
+            if self.model is None:
+                self.load_model()
+                
+            if self.model is None:  # 여전히 None이면 기본값 반환
+                return self._default_feature_importance()
+                
+            # SHAP 사용 시도
+            try:
+                import shap
+                explainer = shap.TreeExplainer(self.model)
+                shap_values = explainer.shap_values(input_data)
+                
+                # 분류 모델인 경우 클래스 1(이탈)에 대한 SHAP 값 선택
+                if isinstance(shap_values, list):
+                    shap_values = shap_values[1]
+                    
+                # 절대값 취해 중요도 계산
+                importance = np.abs(shap_values).mean(axis=0)
+                
+                # 캐시에 저장
+                self.feature_importance_cache = importance
+                return importance
+                
+            except Exception as e:
+                print(f"SHAP을 사용한 특성 중요도 계산 실패: {str(e)}")
+                
+                # 모델에 feature_importances_ 속성이 있으면 사용
+                if hasattr(self.model, 'feature_importances_'):
+                    importance = self.model.feature_importances_
+                    self.feature_importance_cache = importance
+                    return importance
+                    
+                return self._default_feature_importance()
+                
         except Exception as e:
-            # 모든 방법 실패 시 기본 중요도 사용
-            self.feature_importance_cache = {
-                'Tenure': 0.25,
-                'SatisfactionScore': 0.22,
-                'DaySinceLastOrder': 0.18,
-                'OrderCount': 0.15,
-                'HourSpendOnApp': 0.12,
-                'Complain': 0.08
-            }
+            print(f"특성 중요도 계산 중 오류 발생: {str(e)}")
+            return self._default_feature_importance()
+    
+    def _default_feature_importance(self):
+        """특성 중요도 계산이 실패할 경우 기본값을 반환합니다."""
+        # 기본 특성 중요도 값 설정
+        default_importance = np.array([0.25, 0.22, 0.18, 0.15, 0.12, 0.08])
+        self.feature_importance_cache = default_importance
+        return default_importance
     
     def get_feature_importance(self):
-        """
-        계산된 특성 중요도를 반환합니다.
-        
-        Returns:
-            dict: 특성별 중요도
-        """
-        # 특성 중요도가 없으면 기본값 반환
-        if not self.feature_importance_cache:
-            return {
-                'Tenure': 0.25,
-                'SatisfactionScore': 0.22,
-                'DaySinceLastOrder': 0.18,
-                'OrderCount': 0.15,
-                'HourSpendOnApp': 0.12,
-                'Complain': 0.08
-            }
-        
+        """캐시된 특성 중요도를 반환합니다."""
+        if self.feature_importance_cache is None:
+            # 특성 중요도가 계산되지 않았다면 기본값 반환
+            return self._default_feature_importance()
         return self.feature_importance_cache
 
 

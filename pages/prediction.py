@@ -498,6 +498,56 @@ def show():
                     # 요인별 설명
                     for name, impact, desc in weighted_factors:
                         st.markdown(f"**{name}**: {desc}")
+                    
+                    # 디버그 정보 섹션 추가
+                    with st.expander("🔧 디버그 정보"):
+                        debug_tabs = st.tabs(["입력 데이터", "모델 정보", "예측 과정", "로그"])
+                        
+                        with debug_tabs[0]:
+                            st.write("### 처리된 입력 데이터")
+                            st.dataframe(input_df)
+                            st.write("### 원본 입력 데이터")
+                            st.json(input_data)
+                        
+                        with debug_tabs[1]:
+                            st.write("### 모델 정보")
+                            st.write(f"**모델 경로:** {predictor.model_path}")
+                            st.write(f"**모델 로드 상태:** {'성공' if predictor.model is not None else '실패'}")
+                            st.write(f"**특성 중요도 캐시:** {'있음' if predictor.feature_importance_cache else '없음'}")
+                            
+                            if hasattr(predictor.model, 'feature_importances_'):
+                                st.write("### 모델 특성 중요도")
+                                importance_df = pd.DataFrame({
+                                    '특성': input_df.columns,
+                                    '중요도': predictor.model.feature_importances_
+                                })
+                                st.dataframe(importance_df.sort_values('중요도', ascending=False))
+                        
+                        with debug_tabs[2]:
+                            st.write("### 예측 과정")
+                            st.write(f"**이탈 확률 값:** {prob_value}")
+                            st.write(f"**이탈 위험도:** {risk_text}")
+                            st.write(f"**특성 중요도 계산 방법:** {'모델 기반' if feature_importance else '기본값 기반'}")
+                            
+                            st.write("### 모든 영향 요인")
+                            all_factors_df = pd.DataFrame(factors)
+                            st.dataframe(all_factors_df)
+                        
+                        with debug_tabs[3]:
+                            st.write("### 로그 정보")
+                            st.code(f"""
+# 모델 로드 시도
+model_path: {predictor.model_path}
+model_loaded: {predictor.model is not None}
+
+# 입력 데이터 처리
+input_rows: {len(input_df)}
+input_columns: {len(input_df.columns)}
+
+# 예측 수행
+probability: {prob_value:.4f}
+risk_level: {risk_level}
+                            """)
                         
                 except Exception as e:
                     st.error(f"예측 중 오류가 발생했습니다: {str(e)}")
