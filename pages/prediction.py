@@ -657,8 +657,26 @@ def show():
                             st.write(f"**특성 중요도 계산 방법:** {'모델 기반' if is_dict_feature else '기본값 기반'}")
                             
                             st.write("### 모든 영향 요인")
-                            all_factors_df = pd.DataFrame(factors)
-                            st.dataframe(all_factors_df)
+                            
+                            # 안전하게 DataFrame 생성
+                            try:
+                                # 데이터가 존재하고 모든 필드가 있는지 확인
+                                if factors and all(key in factors[0] for key in ['name', 'value', 'weight', 'description']):
+                                    # 필요한 필드만 추출하여 DataFrame 생성
+                                    factor_data = {
+                                        '요인': [f.get('name', '') for f in factors],
+                                        '값': [f.get('value', 0) for f in factors],
+                                        '가중치': [f.get('weight', 0) for f in factors],
+                                        '설명': [f.get('description', '') for f in factors]
+                                    }
+                                    all_factors_df = pd.DataFrame(factor_data)
+                                    st.dataframe(all_factors_df)
+                                else:
+                                    st.warning("영향 요인 데이터를 표시할 수 없습니다.")
+                                    st.write(factors)  # 원본 데이터 표시
+                            except Exception as e:
+                                st.error(f"영향 요인 처리 중 오류 발생: {str(e)}")
+                                st.write("원본 데이터:", factors)
                         
                         with debug_tabs[3]:
                             st.write("### 로그 정보")
