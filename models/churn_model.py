@@ -5,7 +5,6 @@ from utils.cache import load_model
 from utils.logger import setup_logger
 from config import PATHS, MODEL_CONFIG
 import joblib
-import shap
 import pickle
 import os
 import streamlit as st
