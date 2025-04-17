@@ -143,21 +143,57 @@ if st.button("🧠 이탈 예측하기"):
         ))
         st.plotly_chart(fig, use_container_width=True)
 
-        # 📊 주요 변수 영향 시각화
-        processed = predictor._preprocess_data(df_encoded)
-        _ = predictor._compute_feature_importance(processed)
-        fi = predictor.get_feature_importance()
+    #     # 📊 주요 변수 영향 시각화
+    #     processed = predictor._preprocess_data(df_encoded)
+    #     _ = predictor._compute_feature_importance(processed)
+    #     fi = predictor.get_feature_importance()
 
-        st.header("3️⃣ 예측에 영향을 준 주요 요인")
-        fi_df = pd.DataFrame(fi.items(), columns=["Feature", "Importance"]) \
-                 .sort_values("Importance", ascending=False)
+    #     st.header("3️⃣ 예측에 영향을 준 주요 요인")
+    #     fi_df = pd.DataFrame(fi.items(), columns=["Feature", "Importance"]) \
+    #              .sort_values("Importance", ascending=False)
 
-        fig_bar = go.Figure(go.Bar(
-            x=fi_df["Feature"],
-            y=fi_df["Importance"]
-        ))
-        fig_bar.update_layout(xaxis_title="입력 변수", yaxis_title="중요도")
-        st.plotly_chart(fig_bar, use_container_width=True)
+    #     fig_bar = go.Figure(go.Bar(
+    #         x=fi_df["Feature"],
+    #         y=fi_df["Importance"]
+    #     ))
+    #     fig_bar.update_layout(xaxis_title="입력 변수", yaxis_title="중요도")
+    #     st.plotly_chart(fig_bar, use_container_width=True)
 
-    except Exception as e:
-        st.error(f"❌ 예측 실패: {str(e)}")
+    # except Exception as e:
+    #     st.error(f"❌ 예측 실패: {str(e)}")
+
+# 🔽 3️⃣ 예측에 영향을 준 주요 요인 (입력값에 따라 동적 변경)
+
+st.header("3️⃣ 예측에 영향을 준 주요 요인")
+
+# feature importance 가져오기 (컬럼명 포함된 사전 형태)
+importance_dict = predictor.get_feature_importance()
+
+# 컬럼명이 실제 모델에 따라 feature_1 등일 수 있으므로 매핑 정보 불러오기 (옵션)
+# 아래는 예시: 필요 시 별도로 모델.feature_names와 매핑해서 생성 필요
+# feature_mapping = {f"feature_{i+1}": name for i, name in enumerate(model.get_booster().feature_names)}
+# importance_named = {feature_mapping.get(k, k): v for k, v in importance_dict.items()}
+importance_named = importance_dict  # 이미 컬럼명이 포함된 경우 그대로 사용
+
+# 상위 5개만 추출
+fi_df = pd.DataFrame(importance_named.items(), columns=["Feature", "Importance"]) \
+         .sort_values("Importance", ascending=False).head(5)
+
+# 바 차트 시각화
+fig_bar = go.Figure(go.Bar(
+    x=fi_df["Feature"],
+    y=fi_df["Importance"],
+    marker_color='skyblue'
+))
+fig_bar.update_layout(
+    xaxis_title="입력 변수",
+    yaxis_title="중요도",
+    title="\ud83d\udd39 상위 5개 중요 변수 (입력값 기준)",
+    height=400
+)
+st.plotly_chart(fig_bar, use_container_width=True)
+
+# 요약 문장 자동 생성
+st.markdown("\n**📌 예측 해석 요약:**")
+for i, row in fi_df.iterrows():
+    st.markdown(f"- `{row['Feature']}` 변수의 영향도가 {row['Importance']:.2f}로 높게 나타났습니다.")
