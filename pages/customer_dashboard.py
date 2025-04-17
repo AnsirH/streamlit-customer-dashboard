@@ -1,7 +1,10 @@
 import streamlit as st
 import pandas as pd
 from utils.visualizer import Visualizer
-from models.customer_analyzer import analyze_customers
+from utils.model_predictor import ModelPredictor
+# from components.header import show_header
+# from components.animations import add_page_transition
+# from utils.data_generator import generate_sample_data
 
 def show_customer_churn_analysis():
     """
@@ -12,7 +15,7 @@ def show_customer_churn_analysis():
     """
     try:
         # 데이터 분석 실행
-        result_df = analyze_customers()
+        result_df = ModelPredictor.analyze_customers()
         
         # 결과 표시
         st.subheader("고객 이탈 예측 결과")
@@ -177,3 +180,24 @@ def show_customer_dashboard(customer_data):
             display_churn_factors(customer_data)
             display_improvement_suggestions()
 
+# def show():
+#     """고객 대시보드 페이지를 표시하는 함수"""
+#     ModelPredictor.show()
+
+# def show():
+#     # 애니메이션 적용
+#     add_page_transition()
+
+#     show_header()
+
+#     # 임시 데이터 생성
+#     df = generate_sample_data()
+    
+#     # 고객 목록 표시
+#     st.subheader("고객 목록")
+    
+#     # 고객 ID를 클릭 가능한 링크로 표시
+#     for customer_id in df['CustomerID'].unique():
+#         if st.button(f"고객 ID: {customer_id}"):
+#             st.session_state['selected_customer_id'] = customer_id
+#             st.switch_page("pages/customer_analysis.py")
