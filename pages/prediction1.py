@@ -14,48 +14,113 @@ MODEL_PATH = Path(os.path.dirname(__file__)) / ".." / "models" / "xgboost_best_m
 
 # 모델과 전처리 클래스 정의
 class ChurnPredictor:
-    def init(self, model_path):
+    """고객 이탈 예측을 위한 모델 클래스"""
+    
+    def __init__(self, model_path=None):
+        """모델을 로드하고 초기화합니다."""
         self.model = None
-        self.model_path = model_path
+        if model_path is None:
+            self.model_path = MODEL_PATH
+        else:
+            self.model_path = model_path
         self.feature_importance_cache = None
         self.load_model()
-
+        
     def load_model(self):
-        import joblib
-        self.model = joblib.load(self.model_path)
-
-    def predict(self, input_df):
-        if self.model is None:
-            return np.array([0]), np.array([0.5])
-
-        processed_df = self._preprocess_data(input_df)
-
+        """모델 파일을 로드합니다."""
         try:
-            y_proba = self.model.predict_proba(processed_df)[:, 1]
-            # ✅ 커스텀 threshold 적용
-            threshold = 0.3
-            y_pred = (y_proba >= threshold).astype(int)
-            return y_pred, y_proba
+            if not self.model_path.exists():
+                st.error(f"모델 파일을 찾을 수 없습니다: {self.model_path}")
+                return False
+            
+            self.model = joblib.load(self.model_path)
+            st.success(f"✅ 모델 로드 성공: {self.model_path.name}")
+            return True
         except Exception as e:
-            st.error(f"예측 오류: {str(e)}")
-            return np.array([0]), np.array([0.5])
-
-    def _preprocess_data(self, input_df):
-        df = input_df.copy()
-
-        # 누락 컬럼은 0으로 채우기
-        if hasattr(self.model, 'feature_namesin'):
-            expected_columns = list(self.model.feature_namesin)
-            for col in expected_columns:
-                if col not in df.columns:
-                    df[col] = 0
-            df = df[expected_columns]
-        return df
-
-    def get_feature_importance(self):
-        if hasattr(self.model, 'featureimportances'):
-            return dict(zip(self.model.feature_namesin, self.model.featureimportances))
-        return {})  # 기본값 반환
+            st.error(f"모델 로드 실패: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+            return False
+    
+    def predict(self, input_df):
+        """입력 데이터에 대한 이탈 예측을 수행합니다."""
+        try:
+            # 모델이 없으면 로드 시도
+            if self.model is None:
+                if not self.load_model():
+                    st.error("⚠️ 모델 로드 실패! 기본값 반환")
+                    return np.array([0]), np.array([0.5])  # 기본값 반환
+            
+            # 디버그: 모델의 특성 이름 확인
+            with st.expander("디버그: 모델 정보"):
+                st.write("### 모델 정보")
+                st.write("모델 파일 경로:", self.model_path)
+                st.write("모델 타입:", type(self.model).__name__)
+                
+                if hasattr(self.model, 'feature_names_in_'):
+                    st.write("### 모델 특성 정보")
+                    st.write("모델 특성 수:", len(self.model.feature_names_in_))
+                    
+                    # 원핫인코딩된 특성 확인
+                    encoded_features = {}
+                    normal_features = []
+                    for feature in self.model.feature_names_in_:
+                        if '_' in feature:
+                            prefix = feature.split('_')[0]
+                            if prefix not in encoded_features:
+                                encoded_features[prefix] = []
+                            encoded_features[prefix].append(feature)
+                        else:
+                            normal_features.append(feature)
+                    
+                    st.write("### 원핫인코딩된 특성 그룹")
+                    for prefix, features in encoded_features.items():
+                        # expander를 내부에서 사용하지 않고 섹션으로 변경
+                        st.write(f"**{prefix}** ({len(features)}개)")
+                        st.write(sorted(features))
+                        st.markdown("---")
+                    
+                    st.write("### 일반 특성 목록")
+                    st.write(sorted(normal_features))
+            
+            # 데이터 전처리
+            processed_df = self._preprocess_data(input_df)
+            
+            # 예측 수행
+            try:
+                # 예측 및 확률 계산
+                y_pred = self.model.predict(processed_df)
+                y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+                
+                # 디버그: 원시 예측값 출력
+                with st.expander("디버그: 원시 예측값"):
+                    st.write("예측 클래스:", y_pred)
+                    st.write("예측 확률 (원시값):", y_proba)
+                    # 예측값이 너무 낮은 경우 경고
+                    if y_proba[0] < 0.05:
+                        st.warning("⚠️ 예측된 이탈 확률이 매우 낮습니다. 이는 다음과 같은 이유로 발생할 수 있습니다:")
+                        st.write("1. 입력된 고객 데이터가 실제로 이탈 위험이 낮은 경우")
+                        st.write("2. 모델이 대부분의 케이스를 낮은 확률로 예측하도록 학습된 경우")
+                        st.write("3. 데이터 전처리 과정에서 원핫인코딩 등의 문제가 있는 경우")
+                        
+                        # 위험도 높은 구성으로 변경 제안
+                        st.info("테스트를 위해 '낮은 만족도(1)', '적은 주문 횟수(1)', '오래된 마지막 주문(90일+)' 등의 조합으로 시도해보세요.")
+                
+                # 특성 중요도 계산
+                self._compute_feature_importance(processed_df)
+                
+                return y_pred, y_proba
+            except Exception as e:
+                st.error(f"예측 오류: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
+                return np.array([0]), np.array([0.5])  # 기본값 반환
+                
+        except Exception as e:
+            st.error(f"전체 예측 과정 오류: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+            return np.array([0]), np.array([0.5])  # 기본값 반환
     
     def _preprocess_data(self, input_df):
         """입력 데이터를 전처리합니다. (19개 컬럼 -> 28개 컬럼)"""
@@ -655,26 +720,54 @@ def show():
                     st.markdown("---")
                     st.subheader("예측 결과")
                     
-                    # 확률 가중치 적용 (선택 사항)
-                    # 모델이 낮은 확률로 예측하는 경향이 있다면 가중치를 적용하여 시각적으로 조정
-                    prob_multiplier = 10.0  # 확률 조정 가중치 (높게 설정)
-                    adjusted_prob = min(prob_value * prob_multiplier, 1.0)  # 1.0을 초과하지 않도록 함
-                    
-                    # 원본 확률과 조정된 확률 선택
-                    display_prob = adjusted_prob  # 기본값은 조정된 확률로 변경
-                    
-                    # 확률 조정 옵션
-                    prob_option = st.radio(
-                        "확률 표시 방식", 
-                        ["조정된 확률 (가중치 적용)", "원본 확률"],
-                        horizontal=True
+                    # 확률 조정 방식 선택
+                    adjust_method = st.radio(
+                        "확률 조정 방식", 
+                        ["가중치 적용", "시그모이드 변환", "원본 확률"],
+                        horizontal=True,
+                        index=0
                     )
                     
-                    if prob_option == "원본 확률":
-                        display_prob = prob_value
-                        st.info(f"원본 확률({prob_value*100:.1f}%)을 그대로 표시합니다.")
-                    else:
-                        st.info(f"원본 확률({prob_value*100:.1f}%)에 가중치({prob_multiplier}배)를 적용하여 {adjusted_prob*100:.1f}%로 표시합니다.")
+                    # 시그모이드 변환 함수 - 낮은 확률을 좀 더 큰 값으로 변환
+                    def sigmoid_transform(x, k=5):
+                        return 1 / (1 + np.exp(-k * (x - 0.1)))
+                    
+                    # 확률 조정 가중치
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        if adjust_method == "가중치 적용":
+                            prob_multiplier = st.slider("가중치 조정", min_value=1.0, max_value=20.0, value=10.0, step=0.5)
+                            adjusted_prob = min(prob_value * prob_multiplier, 1.0)
+                            st.info(f"원본 확률({prob_value*100:.1f}%)에 가중치({prob_multiplier}배)를 적용하여 {adjusted_prob*100:.1f}%로 표시합니다.")
+                        elif adjust_method == "시그모이드 변환":
+                            k_value = st.slider("변환 강도", min_value=1.0, max_value=10.0, value=5.0, step=0.5)
+                            adjusted_prob = sigmoid_transform(prob_value, k=k_value)
+                            st.info(f"원본 확률({prob_value*100:.1f}%)을 시그모이드 함수(강도: {k_value})로 변환하여 {adjusted_prob*100:.1f}%로 표시합니다.")
+                        else:
+                            adjusted_prob = prob_value
+                            st.info(f"원본 확률({prob_value*100:.1f}%)을 그대로 표시합니다.")
+                    
+                    # 최종 표시 확률 선택
+                    display_prob = adjusted_prob if adjust_method != "원본 확률" else prob_value
+                    
+                    # 임계값 설정
+                    threshold_low = st.slider(
+                        "낮은 위험 임계값", 
+                        min_value=0.0, 
+                        max_value=1.0, 
+                        value=0.3, 
+                        step=0.05,
+                        help="이 값 미만은 낮은 위험으로 분류됩니다."
+                    )
+                    
+                    threshold_high = st.slider(
+                        "높은 위험 임계값", 
+                        min_value=0.0, 
+                        max_value=1.0, 
+                        value=0.7, 
+                        step=0.05,
+                        help="이 값 이상은 높은 위험으로 분류됩니다."
+                    )
                     
                     col1, col2 = st.columns(2)
                     
@@ -687,12 +780,12 @@ def show():
                     
                     with col2:
                         # 위험도 수준 (조정된 확률 기준)
-                        if display_prob < 0.3:
+                        if display_prob < threshold_low:
                             risk_level = "low"
                             risk_text = "낮음"
                             risk_color = "#4CAF50"
                             action_text = "정기적인 마케팅 이메일을 보내고 일반적인 고객 관리를 유지하세요."
-                        elif display_prob < 0.7:
+                        elif display_prob < threshold_high:
                             risk_level = "medium"
                             risk_text = "중간"
                             risk_color = "#FFC107"
