@@ -517,27 +517,30 @@ def show_top_influencers(model, X_input):
 
 
 ##########################
-MODEL_PATH = Path(__file__).parent / "xgboost_best_model.pkl"
+import joblib
+from pathlib import Path
 
-def load_churn_model2(model_path: str = None):
+def load_xgboost_model2():
     """
-    Load the trained churn prediction model.
+    /models/xgboost_best_model.pkl 파일을 로드합니다.
     
-    Args:
-        model_path: Path to the model file. Default is models/xgb_best_model.pkl
-        
     Returns:
-        Trained model
+        model: 학습된 XGBoost 모델
+    Raises:
+        FileNotFoundError: 모델 파일이 존재하지 않을 경우
+        Exception: 모델 로드 중 오류 발생 시
     """
-    if model_path is None:
-        model_path = Path(__file__).parent / "xgb_best_model.pkl"
-    else:
-        model_path = Path(model_path)
-        
+    model_path = Path(__file__).resolve().parent / "xgboost_best_model.pkl"
+
     if not model_path.exists():
-        raise FileNotFoundError(f"Model file not found: {model_path}")
-        
-    return joblib.load(model_path)
+        raise FileNotFoundError(f"[❌ 모델 파일 없음] {model_path}")
+
+    try:
+        model = joblib.load(model_path)
+        return model
+    except Exception as e:
+        raise RuntimeError(f"[❌ 모델 로드 실패] {e}")
+
 
 
 
