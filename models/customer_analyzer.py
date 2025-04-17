@@ -13,7 +13,7 @@ class ChurnPredictor:
         """모델을 로드하고 초기화합니다."""
         self.model = None
         self.feature_importance_cache = {}
-        self.model_path = os.path.join('models', 'xgb_best_model.pkl')
+        self.model_path = os.path.join('models', 'xgboost_best_model.pkl')
         try:
             self.load_model()
         except Exception as e:
@@ -67,13 +67,10 @@ class ChurnPredictor:
             if self.model is None:
                 return self._default_prediction()
             
-            # 데이터 전처리
-            processed_df = self._preprocess_data(input_df)
-            
             # 예측 수행
             try:
-                y_pred = self.model.predict(processed_df)
-                y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+                y_pred = self.model.predict(input_df)
+                y_proba = self.model.predict_proba(input_df)[:, 1]  # 이탈 확률
                 
                 # 예측 결과 확인
                 if len(y_proba) == 0:
@@ -98,69 +95,6 @@ class ChurnPredictor:
     def _default_prediction(self):
         """기본 예측값 반환"""
         return np.array([0]), np.array([0.5])
-    
-    def _preprocess_data(self, input_df):
-        """
-        입력 데이터를 전처리합니다.
-        
-        Args:
-            input_df (pandas.DataFrame): 원본 입력 데이터
-            
-        Returns:
-            pandas.DataFrame: 전처리된 데이터
-        """
-        try:
-            print("전처리 시작 - 입력 데이터 정보:")
-            print(f"컬럼: {input_df.columns.tolist()}")
-            print(f"데이터 타입: {input_df.dtypes}")
-            print(f"첫 번째 행: {input_df.iloc[0].to_dict()}")
-            
-            # 모델이 요구하는 feature 확인
-            if self.model is not None and hasattr(self.model, 'feature_names_'):
-                print("\n모델이 요구하는 feature:")
-                print(self.model.feature_names_)
-            
-            # 입력 데이터 복사
-            df = input_df.copy()
-            
-            # CustomerID 제거 (예측에 사용되지 않음)
-            if 'CustomerID' in df.columns:
-                df = df.drop('CustomerID', axis=1)
-            
-            # Churn 컬럼이 있다면 제거 (타겟 변수이므로 예측에 사용되지 않음)
-            if 'Churn' in df.columns:
-                df = df.drop('Churn', axis=1)
-            
-            # 카테고리형 변수 인코딩
-            categorical_columns = [
-                'PreferredLoginDevice', 'PreferredPaymentMode', 'Gender',
-                'PreferedOrderCat', 'MaritalStatus'
-            ]
-            
-            for col in categorical_columns:
-                if col in df.columns:
-                    print(f"\n{col} 컬럼 처리 전:")
-                    print(f"데이터 타입: {df[col].dtype}")
-                    print(f"고유값: {df[col].unique()}")
-                    
-                    le = LabelEncoder()
-                    df[col] = le.fit_transform(df[col].astype(str))
-                    
-                    print(f"{col} 컬럼 처리 후:")
-                    print(f"데이터 타입: {df[col].dtype}")
-                    print(f"고유값: {df[col].unique()}")
-            
-            print("\n전처리 완료 - 최종 데이터 정보:")
-            print(f"컬럼: {df.columns.tolist()}")
-            print(f"데이터 타입: {df.dtypes}")
-            print(f"첫 번째 행: {df.iloc[0].to_dict()}")
-            
-            return df
-            
-        except Exception as e:
-            print(f"전처리 중 오류 발생: {str(e)}")
-            print(f"오류 발생 위치: {e.__traceback__.tb_lineno}")
-            raise
     
     def _compute_feature_importance(self, input_df):
         """모델의 feature_importances_ 속성을 사용하여 특성 중요도를 계산합니다."""
@@ -224,69 +158,120 @@ def analyze_customers():
     """
     try:
         # 데이터셋 경로 설정
-        data_path = os.path.join('models', 'E Commerce Dataset2.xlsx')
+        data_path = os.path.join('models', 'ecommerce_for_prediction.csv')
         
         # 파일 존재 여부 확인
         if not os.path.exists(data_path):
             raise FileNotFoundError(f"데이터셋 파일을 찾을 수 없습니다: {data_path}")
         
         # 데이터셋 로드
-        df = pd.read_excel(data_path)
+        df = pd.read_csv(data_path)
         
-        # CustomerID 컬럼 확인
+        # CustomerID 컬럼 확인 및 생성
         if 'CustomerID' not in df.columns:
-            raise ValueError("CustomerID 컬럼이 데이터셋에 존재하지 않습니다.")
+            print("CustomerID 컬럼이 없어 순차적인 ID를 생성합니다.")
+            df['CustomerID'] = [f'CUST_{i:06d}' for i in range(1, len(df) + 1)]
         
         # ChurnPredictor 인스턴스 생성
         predictor = ChurnPredictor()
         
+        # 예측을 위한 특성 컬럼 준비 (CustomerID 제외)
+        feature_columns = [col for col in df.columns if col != 'CustomerID']
+        prediction_df = df[feature_columns]  # CustomerID를 제외한 데이터프레임 생성
+        
         # 예측 수행
-        predictions, probabilities = predictor.predict(df)
+        _, churn_probabilities = predictor.predict(prediction_df)
         
         # SHAP 값 계산
         explainer = shap.TreeExplainer(predictor.model)
-        shap_values = explainer.shap_values(X)
+        shap_values = explainer.shap_values(prediction_df)  # CustomerID를 제외한 데이터로 SHAP 값 계산
         
-        # 이탈 확률 예측
-        _, churn_probabilities = predictor.predict(X)
+        # 이진 분류의 경우 positive class의 SHAP 값 사용
+        if isinstance(shap_values, list):
+            shap_values = shap_values[1]
         
-        # 결과 데이터프레임 생성
+        # 특성 이름 한글화 매핑
+        feature_korean = {
+            'DaySinceLastOrder': '마지막 주문 후 경과일',
+            'SatisfactionScore': '만족도 점수',
+            'Complain': '불만 제기',
+            'OrderCount': '주문 횟수',
+            'CashbackAmount': '캐시백 금액',
+            'HourSpendOnApp': '앱 사용 시간',
+            'OrderAmountHikeFromlastYear': '작년 대비 주문 증가율',
+            'CouponUsed': '쿠폰 사용 횟수',
+            'Tenure': '거래 기간',
+            'WarehouseToHome': '배송 거리',
+            'PreferredLoginDevice': '선호 로그인 기기',
+            'PreferredPaymentMode': '선호 결제 수단',
+            'Gender': '성별',
+            'PreferedOrderCat': '선호 주문 카테고리',
+            'MaritalStatus': '결혼 여부'
+        }
+        
+        # 결과 저장을 위한 리스트
         results = []
-        for i, (customer_id, prob) in enumerate(zip(df['CustomerID'], churn_probabilities)):
-            # 해당 고객의 SHAP 값 추출
-            customer_shap = shap_values[i]
+        
+        # 분석에 사용할 특성 컬럼 (CustomerID 제외)
+        feature_columns = [col for col in df.columns if col != 'CustomerID']
+        
+        # 각 고객별로 SHAP 값 분석
+        for idx, (customer_id, prob) in enumerate(zip(df['CustomerID'], churn_probabilities)):
+            # 해당 고객의 SHAP 값
+            customer_shap = shap_values[idx]
             
-            # 모든 특성의 SHAP 값 계산 (부호 유지)
-            shap_values_with_sign = [(feature, shap) 
-                                   for feature, shap in zip(feature_columns, customer_shap)]
+            # 특성별 SHAP 값 계산
+            feature_impacts = []
             
-            # 모든 특성의 SHAP 값 절대값 합계 계산
-            total_abs_shap = sum(abs(shap) for _, shap in shap_values_with_sign)
+            # 전체 SHAP 값의 절대값 합계 계산 (전체 영향도)
+            total_impact = np.sum(np.abs(customer_shap))
             
-            # SHAP 값 기준으로 정렬 (절대값 기준)
-            sorted_features = sorted(shap_values_with_sign, 
-                                   key=lambda x: abs(x[1]), reverse=True)[:3]
+            for feature_name, shap_value in zip(feature_columns, customer_shap):
+                # 특성의 기본 이름 추출 (원-핫 인코딩된 경우 처리)
+                base_feature_name = feature_name.split('_')[0] if '_' in feature_name else feature_name
+                
+                # 특성의 한글 이름
+                feature_kr = feature_korean.get(base_feature_name, feature_name)
+                
+                # 원-핫 인코딩된 경우 세부 값 추가
+                if '_' in feature_name:
+                    feature_value = feature_name.split('_', 1)[1]  # 첫 번째 '_' 이후의 모든 부분을 값으로 사용
+                    feature_kr = f"{feature_kr} ({feature_value})"
+                
+                # SHAP 값의 절대값과 부호 저장
+                abs_impact = abs(shap_value)
+                # 전체 영향도 대비 상대적 중요도 계산 (백분율)
+                relative_importance = (abs_impact / total_impact * 100) if total_impact > 0 else 0
+                # 영향의 방향 결정 (양수: 이탈 확률 증가, 음수: 이탈 확률 감소)
+                if shap_value > 0:
+                    direction = "⚠️ 부정"
+                else:
+                    direction = "✅ 긍정"
+                
+                feature_impacts.append({
+                    'feature': feature_kr,
+                    'importance': relative_importance,
+                    'direction': direction,
+                    'raw_shap': shap_value
+                })
             
-            # 정규화된 중요도 계산 (전체 특성 대비 비율)
-            normalized_importances = [(feature, shap / total_abs_shap * 100) 
-                                   for feature, shap in sorted_features]
+            # 중요도가 큰 순서대로 정렬
+            feature_impacts.sort(key=lambda x: x['importance'], reverse=True)
             
-            # 방향성 정보를 포함한 특성 이름 생성
-            feature_names = []
-            for feature, importance in normalized_importances:
-                direction = "증가" if importance > 0 else "감소"
-                feature_names.append(f"{feature} ({direction})")
+            # 상위 3개 특성 추출
+            top_features = feature_impacts[:3]
             
+            # 결과 저장
             result = {
                 'CustomerID': customer_id,
-                'Churn Risk': prob,
-                'Top Feature 1': feature_names[0],
-                'Importance 1': abs(normalized_importances[0][1]),
-                'Top Feature 2': feature_names[1],
-                'Importance 2': abs(normalized_importances[1][1]),
-                'Top Feature 3': feature_names[2],
-                'Importance 3': abs(normalized_importances[2][1])
+                'Churn Risk': prob
             }
+            
+            # 상위 3개 특성 정보 저장
+            for i, feature in enumerate(top_features, 1):
+                result[f'Top Feature {i}'] = f"{feature['feature']} ({feature['direction']})"
+                result[f'Importance {i}'] = feature['importance']
+            
             results.append(result)
         
         # 결과 DataFrame 생성
@@ -300,9 +285,29 @@ def analyze_customers():
         
         return result_df
         
-    except FileNotFoundError as e:
-        raise Exception(f"파일을 찾을 수 없습니다: {str(e)}")
-    except ValueError as e:
-        raise Exception(f"데이터 처리 중 오류가 발생했습니다: {str(e)}")
     except Exception as e:
-        raise Exception(f"고객 분석 중 오류가 발생했습니다: {str(e)}") 
+        print(f"고객 분석 중 오류 발생: {str(e)}")
+        raise 
+
+def load_customer_data():
+    """
+    전체 고객 데이터를 로드합니다.
+    Returns:
+        DataFrame: 모든 컬럼을 포함한 전체 고객 데이터
+    """
+    try:
+        # 데이터셋 경로 설정
+        data_path = os.path.join('models', 'ecommerce_for_prediction.csv')
+        
+        # 파일 존재 여부 확인
+        if not os.path.exists(data_path):
+            raise FileNotFoundError(f"데이터셋 파일을 찾을 수 없습니다: {data_path}")
+        
+        # 데이터셋 로드
+        df = pd.read_csv(data_path)
+        
+        return df
+        
+    except Exception as e:
+        print(f"데이터 로드 중 오류 발생: {str(e)}")
+        raise 
