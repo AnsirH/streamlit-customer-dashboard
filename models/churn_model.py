@@ -18,10 +18,13 @@ logger = setup_logger(__name__)
 class ChurnPredictor:
     """고객 이탈 예측을 위한 모델 클래스"""
     
-    def __init__(self, model_path):
+    def __init__(self, model_path=None):
         """모델을 로드하고 초기화합니다."""
         self.model = None
-        self.model_path = model_path
+        if model_path is None:
+            self.model_path = Path(__file__).parent / "xgb_best_model.pkl"
+        else:
+            self.model_path = model_path
         self.feature_importance_cache = None  # 특성 중요도 캐시 추가
         try:
             self.load_model()
