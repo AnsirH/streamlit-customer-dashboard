@@ -22,13 +22,13 @@ st.sidebar.title("메뉴")
 # 페이지 이동 버튼
 if st.sidebar.button("📊 고객분석", use_container_width=True):
     st.session_state.current_page = 'customer_analysis'
-    st.rerun()
+    st.experimental_rerun()
 if st.sidebar.button("🔮 예측", use_container_width=True):
     st.session_state.current_page = 'prediction'
-    st.rerun()
+    st.experimental_rerun()
 if st.sidebar.button("📈 전체 데이터", use_container_width=True):
     st.session_state.current_page = 'all_data'
-    st.rerun()
+    st.experimental_rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("⬇️ **스크롤**")

@@ -10,6 +10,7 @@ def generate_sample_data(n_samples=1000):
     numeric_data = {
         'customer_id': [f'C{i:04d}' for i in range(1, n_samples+1)],
         'churn_risk': np.random.uniform(0, 1, n_samples).astype(float),
+        'churn_probability': np.random.uniform(0, 1, n_samples).astype(float),
         'Tenure': np.random.randint(1, 60, n_samples).astype(int),
         'CityTier': np.random.randint(1, 4, n_samples).astype(int),
         'WarehouseToHome': np.random.randint(5, 50, n_samples).astype(int),
@@ -42,6 +43,9 @@ def generate_sample_data(n_samples=1000):
     for i in range(1, 4):
         df[f'top_feature_{i}'] = np.random.choice(features, n_samples)
         df[f'importance_{i}'] = np.random.uniform(0.1, 0.3, n_samples)
+    
+    # CustomerID 컬럼 추가 (customer_id와 동일한 값)
+    df['CustomerID'] = df['customer_id']
     
     # 열 타입 명시적 지정
     numeric_columns = list(numeric_data.keys()) + [f'importance_{i}' for i in range(1, 4)]
