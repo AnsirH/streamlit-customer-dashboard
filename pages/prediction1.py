@@ -141,75 +141,7 @@ if st.button("🧠 이탈 예측하기"):
                 ]
             }
         ))
-        st.plotly_chart(fig, use_container_width=True)
-        
-    #     # 🔽 3️⃣ 예측에 영향을 준 주요 요인
-    #     st.header("3️⃣ 예측에 영향을 준 주요 요인")
-
-    #     # ✅ feature 이름 매핑 딕셔너리 (원-핫 인코딩 항목 통합, 한글명)
-    #     feature_name_map = {
-    #         "feature_1": "이용 기간",
-    #         "feature_2": "거주 도시 등급",
-    #         "feature_3": "창고-집 거리",
-    #         "feature_4": "앱 사용 시간",
-    #         "feature_5": "등록된 기기 수",
-    #         "feature_6": "만족도 점수",
-    #         "feature_7": "배송지 등록 수",
-    #         "feature_8": "불만 제기 여부",
-    #         "feature_9": "주문금액 상승률",
-    #         "feature_10": "쿠폰 사용 횟수",
-    #         "feature_11": "주문 횟수",
-    #         "feature_12": "마지막 주문 후 경과일",
-    #         "feature_13": "캐시백 금액",
-    #         "feature_14": "선호 로그인 기기",
-    #         "feature_15": "선호 로그인 기기",
-    #         "feature_16": "선호 결제 방식",
-    #         "feature_17": "선호 결제 방식",
-    #         "feature_18": "선호 결제 방식",
-    #         "feature_19": "선호 결제 방식",
-    #         "feature_20": "선호 결제 방식",
-    #         "feature_21": "선호 결제 방식",
-    #         "feature_22": "성별",
-    #         "feature_23": "선호 주문 카테고리",
-    #         "feature_24": "선호 주문 카테고리",
-    #         "feature_25": "선호 주문 카테고리",
-    #         "feature_26": "선호 주문 카테고리",
-    #         "feature_27": "결혼 여부",
-    #         "feature_28": "결혼 여부"
-    #     }
-
-    #     # ✅ predictor로부터 중요도 원시 딕셔너리 가져오기
-    #     importance_raw = predictor.get_feature_importance()
-
-    #     # ✅ feature 번호를 한글 컬럼명으로 매핑
-    #     importance_named = {
-    #         feature_name_map.get(k, k): v for k, v in importance_raw.items()
-    #     }
-
-    #     # ✅ 상위 5개 변수 추출 (동일 변수 그룹핑 후 합산)
-    #     fi_df = pd.DataFrame(importance_named.items(), columns=["Feature", "Importance"]) \
-    #             .groupby("Feature").sum().sort_values("Importance", ascending=False).head(5).reset_index()
-
-    #     # ✅ 바 차트 시각화
-    #     fig_bar = go.Figure(go.Bar(
-    #         x=fi_df["Feature"],
-    #         y=fi_df["Importance"],
-    #         marker_color='skyblue'
-    #     ))
-    #     fig_bar.update_layout(
-    #         xaxis_title="입력 변수",
-    #         yaxis_title="중요도",
-    #         title="📊 상위 5개 중요 변수 (입력값 기준)",
-    #         height=400
-    #     )
-    #     st.plotly_chart(fig_bar, use_container_width=True)
-
-    #     # ✅ 요약 문장 자동 생성
-    #     st.markdown("📌 **예측 해석 요약:**")
-    #     for _, row in fi_df.iterrows():
-    #         st.markdown(f"- `{row['Feature']}` 변수의 영향도가 **{row['Importance']:.2f}**로 높게 나타났습니다.")
-    # except Exception as e:
-    #     st.error(f"❌ 예측 실패: {str(e)}")
+        st.plotly_chart(fig, use_container_width=True)     
 
         # 3️⃣ 예측에 영향을 준 주요 요인
         st.header("3️⃣ 예측에 영향을 준 주요 요인")
@@ -260,7 +192,7 @@ if st.button("🧠 이탈 예측하기"):
         st.plotly_chart(fig_top, use_container_width=True)
 
         # 해석 출력
-        st.markdown("📌 **상위 요인 해석 요약:**")
+        st.markdown("📌 **높은 연관성성:**")
         for _, row in top5.iterrows():
             level = map_importance_level(row["Importance"])
             st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
@@ -279,7 +211,7 @@ if st.button("🧠 이탈 예측하기"):
         st.plotly_chart(fig_bottom, use_container_width=True)
 
         # 해석 출력
-        st.markdown("📌 **하위 요인 해석 요약:**")
+        st.markdown("📌 **낮은 연관성성**")
         for _, row in bottom5.iterrows():
             level = map_importance_level(row["Importance"])
             st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
