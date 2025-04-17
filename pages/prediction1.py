@@ -720,35 +720,31 @@ def show():
                     st.markdown("---")
                     st.subheader("예측 결과")
                     
-                    # 확률 조정 방식 선택
-                    adjust_method = st.radio(
-                        "확률 조정 방식", 
-                        ["가중치 적용", "시그모이드 변환", "원본 확률"],
-                        horizontal=True,
-                        index=0
-                    )
-                    
                     # 시그모이드 변환 함수 - 낮은 확률을 좀 더 큰 값으로 변환
-                    def sigmoid_transform(x, k=5):
-                        return 1 / (1 + np.exp(-k * (x - 0.1)))
+                    def sigmoid_transform(x, k=8, x0=0.15):
+                        """
+                        시그모이드 변환 함수
+                        x: 원본 확률
+                        k: 기울기 계수 (높을수록 더 가파른 변화)
+                        x0: 변곡점 (이 값에서 가장 급격한 변화)
+                        """
+                        return 1 / (1 + np.exp(-k * (x - x0)))
                     
-                    # 확률 조정 가중치
-                    col1, col2 = st.columns([3, 1])
+                    # 시그모이드 파라미터 조정 슬라이더
+                    col1, col2 = st.columns([1, 1])
                     with col1:
-                        if adjust_method == "가중치 적용":
-                            prob_multiplier = st.slider("가중치 조정", min_value=1.0, max_value=20.0, value=10.0, step=0.5)
-                            adjusted_prob = min(prob_value * prob_multiplier, 1.0)
-                            st.info(f"원본 확률({prob_value*100:.1f}%)에 가중치({prob_multiplier}배)를 적용하여 {adjusted_prob*100:.1f}%로 표시합니다.")
-                        elif adjust_method == "시그모이드 변환":
-                            k_value = st.slider("변환 강도", min_value=1.0, max_value=10.0, value=5.0, step=0.5)
-                            adjusted_prob = sigmoid_transform(prob_value, k=k_value)
-                            st.info(f"원본 확률({prob_value*100:.1f}%)을 시그모이드 함수(강도: {k_value})로 변환하여 {adjusted_prob*100:.1f}%로 표시합니다.")
-                        else:
-                            adjusted_prob = prob_value
-                            st.info(f"원본 확률({prob_value*100:.1f}%)을 그대로 표시합니다.")
+                        k_value = st.slider("변환 강도", min_value=1.0, max_value=15.0, value=8.0, step=0.5,
+                                          help="높을수록 더 가파른 변화가 일어납니다.")
+                    with col2:
+                        x0_value = st.slider("변곡점", min_value=0.0, max_value=0.5, value=0.15, step=0.01,
+                                           help="이 확률값에서 가장 급격한 변화가 일어납니다.")
                     
-                    # 최종 표시 확률 선택
-                    display_prob = adjusted_prob if adjust_method != "원본 확률" else prob_value
+                    # 확률 변환 적용
+                    orig_prob = prob_value
+                    adjusted_prob = sigmoid_transform(orig_prob, k=k_value, x0=x0_value)
+                    
+                    # 변환 전후 비교 정보
+                    st.info(f"원본 확률 {orig_prob*100:.1f}%를 시그모이드 함수로 변환하여 {adjusted_prob*100:.1f}%로 조정했습니다.")
                     
                     # 임계값 설정
                     threshold_low = st.slider(
@@ -774,18 +770,25 @@ def show():
                     with col1:
                         # 이탈 확률 게이지
                         st.plotly_chart(
-                            create_churn_gauge(display_prob),
+                            create_churn_gauge(adjusted_prob),
                             use_container_width=True
                         )
-                    
+                        
+                        # 원본과 변환 후 값 비교 표시
+                        st.metric(
+                            label="조정된 확률", 
+                            value=f"{adjusted_prob*100:.1f}%", 
+                            delta=f"{(adjusted_prob-orig_prob)*100:.1f}%"
+                        )
+                        
                     with col2:
                         # 위험도 수준 (조정된 확률 기준)
-                        if display_prob < threshold_low:
+                        if adjusted_prob < threshold_low:
                             risk_level = "low"
                             risk_text = "낮음"
                             risk_color = "#4CAF50"
                             action_text = "정기적인 마케팅 이메일을 보내고 일반적인 고객 관리를 유지하세요."
-                        elif display_prob < threshold_high:
+                        elif adjusted_prob < threshold_high:
                             risk_level = "medium"
                             risk_text = "중간"
                             risk_color = "#FFC107"
@@ -799,7 +802,8 @@ def show():
                         # 결과 요약
                         st.markdown(f"""
                         ### 예측 결과 요약
-                        - **이탈 확률**: {display_prob*100:.1f}%
+                        - **원본 확률**: {orig_prob*100:.1f}%
+                        - **조정된 확률**: {adjusted_prob*100:.1f}%
                         - **위험도**: <span style='color:{risk_color};font-weight:bold'>{risk_text}</span>
                         
                         ### 권장 조치
