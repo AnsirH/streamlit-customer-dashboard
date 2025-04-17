@@ -139,7 +139,6 @@ def get_customer_top_features(shap_values, X, idx, n=5):
 # ===============================
 # 고난이도 함수 업데이트
 # ===============================
-  
 
 
 ##########################
@@ -254,6 +253,63 @@ def show_churn_risk_dashboard(probability: float):
 
     st.subheader("🛠 권장 조치")
     st.markdown(f"{recommendation}")
+
+
+####################################################
+# 이탈 예측 함수 모음
+####################################################
+
+
+# 1. 📄 모델 & 데이터 로딩
+@st.cache_resource
+def load_model_and_data(model_path, data_path):
+    model = joblib.load(model_path)
+    df = pd.read_pickle(data_path)
+    return model, df
+
+# 2. 📋 컬럼별 고객 정보 출력
+def show_customer_info(customer_row):
+    st.subheader("📋 고객 입력 데이터")
+    for col, val in customer_row.items():
+        st.write(f"**{col}**: {val}")
+
+# 3. 🎯 위험도 게이지 표시
+def show_churn_gauge(prob):
+    if prob <= 1: prob *= 100
+    risk = round(prob, 2)
+    level = "높음" if risk >= 70 else ("중간" if risk >= 30 else "낮음")
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=risk,
+        number={"suffix": "%"},
+        title={"text": "이탈 가능성 (%)"},
+        gauge={
+            "axis": {"range": [0, 100]},
+            "bar": {"color": "darkblue"},
+            "steps": [
+                {"range": [0, 30], "color": "green"},
+                {"range": [30, 70], "color": "yellow"},
+                {"range": [70, 100], "color": "red"}
+            ]
+        }
+    ))
+    st.subheader("📈 예측 결과")
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown(f"**예측 확률**: {risk:.2f}%  |  **위험도**: :red[{level}]" if level == "높음" else f"**예측 확률**: {risk:.2f}%  |  **위험도**: :orange[{level}]" if level == "중간" else f"**예측 확률**: {risk:.2f}%  |  **위험도**: :green[{level}]")
+
+# 4. 🔍 SHAP 상위 3개 영향 변수 시각화
+def show_top_influencers(model, X_input):
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X_input)
+    shap_df = pd.DataFrame(shap_values[1], columns=X_input.columns)
+    shap_df_mean = shap_df.abs().mean().sort_values(ascending=False).head(3)
+    fig = px.bar(x=shap_df_mean.index, y=shap_df_mean.values,
+                 labels={'x': 'Feature', 'y': 'SHAP 평균 영향도'}, title='📌 주요 영향 요인 Top 3')
+    st.plotly_chart(fig, use_container_width=True)
+
+
+
+
 
 ##########################
 
