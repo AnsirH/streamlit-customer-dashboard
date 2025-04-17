@@ -377,7 +377,7 @@ def create_churn_gauge(value):
     """이탈 가능성 게이지 차트를 생성합니다."""
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
-        value=value * 100,
+        value=value * 100,  # 0~1 확률값을 퍼센트로 변환
         title={"text": "이탈 가능성 (%)"},
         gauge={
             'axis': {'range': [0, 100]},
@@ -388,7 +388,8 @@ def create_churn_gauge(value):
             ],
             'bar': {'color': 'darkblue'},
             'threshold': {'line': {'color': 'red', 'width': 4}, 'value': value * 100}
-        }
+        },
+        number={'suffix': "%"}  # 퍼센트 표시 추가
     ))
     fig.update_layout(height=300, margin=dict(l=20, r=20, t=50, b=20))
     return fig
@@ -735,7 +736,7 @@ def show():
                         # 결과 요약
                         st.markdown(f"""
                         ### 예측 결과 요약
-                        - **이탈 확률**: {prob_value:.2%}
+                        - **이탈 확률**: {prob_value*100:.1f}%
                         - **위험도**: <span style='color:{risk_color};font-weight:bold'>{risk_text}</span>
                         
                         ### 권장 조치
@@ -790,7 +791,7 @@ def show():
                         # 주요 피처별 설명
                         st.write("### 영향 요인 분석")
                         for feature, importance in list(top_features.items())[:3]:
-                            st.write(f"**{feature}** (중요도: {importance:.4f})")
+                            st.write(f"**{feature}** (중요도: {importance*100:.2f}%)")
                             
                             # 특성별 설명
                             if "거래기간" in feature:
