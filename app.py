@@ -1,7 +1,6 @@
 import streamlit as st
 from components.header import show_header
 from components.animations import add_page_transition
-from pages import home, dashboard, prediction, customer, debug  # debug 추가
 
 # 페이지 설정
 st.set_page_config(
@@ -46,17 +45,4 @@ elif st.session_state.current_page == 'prediction':
     show()
 elif st.session_state.current_page == 'all_data':
     from pages.all_data import show
-    show()
-elif st.session_state.current_page == 'debug':
-    from pages.debug import show
-    show()
-
-# Define pages
-# Dictionary format - {'name_of_page': page_routing_function}
-PAGES = {
-    "홈": home.show,
-    "대시보드": dashboard.show,
-    "고객 분석": customer.show,
-    "이탈 예측": prediction.show,
-    "디버그": debug.show  # 디버그 페이지 추가
-} 
+    show() 
