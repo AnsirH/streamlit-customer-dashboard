@@ -147,6 +147,13 @@ class ChurnPredictor:
             st.write("### 전처리 시작")
             st.write("원본 입력 컬럼:", sorted(df.columns.tolist()))
             
+            # 모델이 예상하는 컬럼 확인
+            if hasattr(self.model, 'feature_names_in_'):
+                model_features = list(self.model.feature_names_in_)
+                st.write("### 모델이 예상하는 컬럼")
+                st.write(f"컬럼 수: {len(model_features)}")
+                st.write(sorted(model_features))
+            
             # CustomerID 제거 (예측에 사용되지 않음)
             columns_to_remove = ['CustomerID', 'customer_id', 'customerid', 'cust_id', 'id', 'Customer_ID']
             for col in columns_to_remove:
@@ -339,6 +346,24 @@ class ChurnPredictor:
                 st.write("모델 기대 컬럼 수:", len(expected_columns))
                 st.write("현재 컬럼 수:", len(df.columns))
                 
+                # 테이블 형태로 비교 결과 표시
+                st.write("### 컬럼 매핑 상태")
+                comparison_data = []
+                
+                # 모델이 기대하는 각 컬럼에 대해 현재 데이터프레임에 존재하는지 확인
+                for col in expected_columns:
+                    status = "✅ 존재" if col in df.columns else "❌ 누락"
+                    comparison_data.append({"컬럼명": col, "상태": status})
+                
+                # 추가로 데이터프레임에 있지만 모델이 기대하지 않는 컬럼 찾기
+                for col in df.columns:
+                    if col not in expected_columns:
+                        comparison_data.append({"컬럼명": col, "상태": "⚠️ 불필요 (제거 예정)"})
+                
+                # 비교 데이터를 DataFrame으로 변환하여 표시
+                comparison_df = pd.DataFrame(comparison_data)
+                st.dataframe(comparison_df)
+                
                 # 누락된 컬럼 추가
                 missing_cols = []
                 for col in expected_columns:
@@ -372,6 +397,28 @@ class ChurnPredictor:
                     st.success("✅ 컬럼 매핑 완료! 모델과 데이터가 정확히 일치합니다.")
                 else:
                     st.error("❌ 컬럼 매핑 불일치! 모델과 데이터가 일치하지 않습니다.")
+                
+                # 컬럼 순서가 일치하는지 확인
+                order_mismatch = False
+                for i, (expected, actual) in enumerate(zip(expected_columns, df.columns)):
+                    if expected != actual:
+                        order_mismatch = True
+                        st.warning(f"컬럼 순서 불일치: 위치 {i}에서 {expected} 대신 {actual} 발견")
+                
+                if not order_mismatch:
+                    st.success("✅ 컬럼 순서도 정확히 일치합니다!")
+                else:
+                    st.warning("⚠️ 컬럼 순서가 일치하지 않습니다. 정확한 순서로 재정렬합니다.")
+                    # 컬럼 순서 재조정
+                    df = df[expected_columns]
+                    
+                # 데이터 유형 확인
+                st.write("### 최종 데이터 유형")
+                data_types = pd.DataFrame({
+                    "컬럼명": df.columns,
+                    "데이터 유형": [str(df[col].dtype) for col in df.columns]
+                })
+                st.dataframe(data_types)
         
         return df
     
