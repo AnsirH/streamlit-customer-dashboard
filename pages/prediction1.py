@@ -721,7 +721,7 @@ def show():
                     st.subheader("예측 결과")
                     
                     # 시그모이드 변환 함수 - 낮은 확률을 좀 더 큰 값으로 변환
-                    def sigmoid_transform(x, k=8, x0=0.15):
+                    def sigmoid_transform(x, k=15, x0=0.15):
                         """
                         시그모이드 변환 함수
                         x: 원본 확률
@@ -731,20 +731,19 @@ def show():
                         return 1 / (1 + np.exp(-k * (x - x0)))
                     
                     # 시그모이드 파라미터 조정 슬라이더
-                    col1, col2 = st.columns([1, 1])
-                    with col1:
-                        k_value = st.slider("변환 강도", min_value=1.0, max_value=15.0, value=8.0, step=0.5,
-                                          help="높을수록 더 가파른 변화가 일어납니다.")
-                    with col2:
-                        x0_value = st.slider("변곡점", min_value=0.0, max_value=0.5, value=0.15, step=0.01,
-                                           help="이 확률값에서 가장 급격한 변화가 일어납니다.")
+                    # 변환 강도는 15로 고정
+                    k_value = 15.0
+                    
+                    # 변곡점은 0~1 전체 범위에서 조정 가능
+                    x0_value = st.slider("변곡점", min_value=0.0, max_value=1.0, value=0.15, step=0.01,
+                                       help="이 확률값에서 가장 급격한 변화가 일어납니다. 낮은 값으로 설정할수록 더 많은 고객이 높은 이탈 위험으로 표시됩니다.")
                     
                     # 확률 변환 적용
                     orig_prob = prob_value
                     adjusted_prob = sigmoid_transform(orig_prob, k=k_value, x0=x0_value)
                     
                     # 변환 전후 비교 정보
-                    st.info(f"원본 확률 {orig_prob*100:.1f}%를 시그모이드 함수로 변환하여 {adjusted_prob*100:.1f}%로 조정했습니다.")
+                    st.info(f"원본 확률 {orig_prob*100:.1f}%를 시그모이드 함수(강도: 15, 변곡점: {x0_value})로 변환하여 {adjusted_prob*100:.1f}%로 조정했습니다.")
                     
                     # 임계값 설정
                     threshold_low = st.slider(
