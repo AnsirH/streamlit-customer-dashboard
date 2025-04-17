@@ -517,7 +517,10 @@ def show():
                             st.write("### 모델 정보")
                             st.write(f"**모델 경로:** {predictor.model_path}")
                             st.write(f"**모델 로드 상태:** {'성공' if predictor.model is not None else '실패'}")
-                            st.write(f"**특성 중요도 캐시:** {'있음' if predictor.feature_importance_cache else '없음'}")
+                            
+                            # NumPy 배열 직접 평가 방지
+                            has_cache = predictor.feature_importance_cache is not None
+                            st.write(f"**특성 중요도 캐시:** {'있음' if has_cache else '없음'}")
                             
                             if hasattr(predictor.model, 'feature_importances_'):
                                 st.write("### 모델 특성 중요도")
@@ -531,7 +534,10 @@ def show():
                             st.write("### 예측 과정")
                             st.write(f"**이탈 확률 값:** {prob_value}")
                             st.write(f"**이탈 위험도:** {risk_text}")
-                            st.write(f"**특성 중요도 계산 방법:** {'모델 기반' if feature_importance else '기본값 기반'}")
+                            
+                            # NumPy 배열 직접 평가 방지
+                            is_dict_feature = isinstance(feature_importance, dict)
+                            st.write(f"**특성 중요도 계산 방법:** {'모델 기반' if is_dict_feature else '기본값 기반'}")
                             
                             st.write("### 모든 영향 요인")
                             all_factors_df = pd.DataFrame(factors)
