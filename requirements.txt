@@ -1,19 +1,19 @@
 # Python 버전: 3.9 또는 3.10 권장
 # Python 3.8-3.11에서 호환성 확인됨
 
-# 데이터 처리 및 분석
+# 필수 패키지
 numpy==1.24.3
 pandas==1.5.3
+streamlit==1.22.0
+plotly==5.13.1
+scikit-learn==1.2.2
+
+# 데이터 처리 및 분석
 openpyxl==3.1.2
 
 # 머신러닝 및 모델링
-scikit-learn==1.2.2
 xgboost==1.7.6
 lightgbm==4.1.0
 imbalanced-learn==0.10.1
 joblib==1.2.0
 shap==0.41.0
-
-# 웹 대시보드
-streamlit==1.22.0
-plotly==5.13.1
