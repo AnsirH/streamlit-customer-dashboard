@@ -2,9 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from models.customer_analyzer import analyze_customers
-from components.header import show_header
-from components.animations import add_page_transition
-from st_aggrid import AgGrid, GridOptionsBuilder
 
 def create_importance_gauge(importance):
     """중요도를 게이지 차트로 표시"""
