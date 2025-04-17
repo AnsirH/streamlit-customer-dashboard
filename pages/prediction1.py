@@ -722,22 +722,24 @@ def show():
                     
                     # 확률 가중치 적용 (선택 사항)
                     # 모델이 낮은 확률로 예측하는 경향이 있다면 가중치를 적용하여 시각적으로 조정
-                    prob_multiplier = 2.0  # 확률 조정 가중치
+                    prob_multiplier = 10.0  # 확률 조정 가중치 (높게 설정)
                     adjusted_prob = min(prob_value * prob_multiplier, 1.0)  # 1.0을 초과하지 않도록 함
                     
                     # 원본 확률과 조정된 확률 선택
-                    display_prob = prob_value  # 기본값은 원본 확률
+                    display_prob = adjusted_prob  # 기본값은 조정된 확률로 변경
                     
                     # 확률 조정 옵션
                     prob_option = st.radio(
                         "확률 표시 방식", 
-                        ["원본 확률", "조정된 확률 (가중치 적용)"],
+                        ["조정된 확률 (가중치 적용)", "원본 확률"],
                         horizontal=True
                     )
                     
-                    if prob_option == "조정된 확률 (가중치 적용)":
-                        display_prob = adjusted_prob
-                        st.info(f"원본 확률({prob_value*100:.1f}%)에 가중치({prob_multiplier}배)를 적용하여 표시합니다.")
+                    if prob_option == "원본 확률":
+                        display_prob = prob_value
+                        st.info(f"원본 확률({prob_value*100:.1f}%)을 그대로 표시합니다.")
+                    else:
+                        st.info(f"원본 확률({prob_value*100:.1f}%)에 가중치({prob_multiplier}배)를 적용하여 {adjusted_prob*100:.1f}%로 표시합니다.")
                     
                     col1, col2 = st.columns(2)
                     
@@ -911,42 +913,35 @@ def show():
             _, y_proba = predictor.predict(extreme_df)
             extreme_prob = y_proba[0]
             
+            # 높은 가중치 적용 (극단적 케이스는 더 높은 가중치 적용)
+            extreme_multiplier = 15.0
+            adjusted_extreme = min(extreme_prob * extreme_multiplier, 1.0)
+            
             # 결과 표시
             st.markdown("### 극단적 이탈 위험 테스트 결과")
             col1, col2 = st.columns(2)
             
             with col1:
-                # 이탈 확률 게이지
+                # 이탈 확률 게이지 (조정된 값)
                 st.plotly_chart(
-                    create_churn_gauge(extreme_prob),
+                    create_churn_gauge(adjusted_extreme),
                     use_container_width=True
                 )
+                st.caption(f"조정된 확률: {adjusted_extreme*100:.1f}% (원본: {extreme_prob*100:.1f}% × {extreme_multiplier})")
             
             with col2:
+                st.write(f"**원본 예측 확률**: {extreme_prob*100:.1f}%")
+                st.write(f"**조정된 예측 확률**: {adjusted_extreme*100:.1f}%")
+                
                 if extreme_prob < 0.05:
-                    st.error("⚠️ 모델이 극단적인 케이스에서도 낮은 확률을 예측합니다!")
+                    st.warning("⚠️ 모델이 극단적인 케이스에서도 낮은 확률을 예측합니다!")
                     st.write("이는 다음과 같은 원인으로 인한 것일 수 있습니다:")
                     st.write("1. 모델 자체가 이탈 확률을 과소평가하도록 학습되었을 수 있습니다.")
                     st.write("2. 모델의 입력 특성 매핑에 문제가 있을 수 있습니다.")
                     st.write("3. 모델이 특정 조합의 특성에 대해 제대로 학습되지 않았을 수 있습니다.")
-                    
-                    # 대안 제시
-                    st.write("**대안:** 원본 확률에 가중치를 적용하여 시각화할 수 있습니다.")
-                    # 가중치 적용된 확률 (최대 1.0)
-                    adjusted_extreme = min(extreme_prob * 5.0, 1.0)
-                    st.success(f"가중치 적용 확률: {adjusted_extreme*100:.1f}%")
-                    
-                    # 조정된 게이지 표시
-                    st.plotly_chart(
-                        create_churn_gauge(adjusted_extreme),
-                        use_container_width=True
-                    )
                 else:
                     st.success(f"예측된 이탈 확률: {extreme_prob*100:.1f}%")
-                    if extreme_prob > 0.5:
-                        st.write("✅ 모델이 이 극단적인 케이스를 높은 이탈 위험으로 올바르게 예측했습니다.")
-                    else:
-                        st.write("⚠️ 모델이 이 극단적인 케이스에 대해 중간 수준의 이탈 위험을 예측했습니다.")
+                    st.write("⚠️ 실제 이탈 위험은 더 높을 수 있으며, 조정된 확률이 이를 더 잘 반영합니다.")
             
             # 입력 데이터 표시
             with st.expander("극단적 케이스 입력 데이터"):
