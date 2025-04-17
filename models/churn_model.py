@@ -108,11 +108,74 @@ class ChurnPredictor:
         if 'Complain' in df.columns and isinstance(df['Complain'].iloc[0], str):
             df['Complain'] = df['Complain'].apply(lambda x: 1 if x == '예' else 0)
         
-        # 디버그 출력 추가
-        st.write(f"🔍 디버그: 데이터 전처리 완료 - 컬럼 수: {len(df.columns)}")
-        st.write(f"🔍 디버그: 전처리된 컬럼: {df.columns.tolist()}")
+        # 모델이 없으면 전처리 불가능
+        if self.model is None or not hasattr(self.model, 'feature_names_in_'):
+            st.error("🔍 디버그: 모델이 로드되지 않았거나 feature_names_in_ 속성이 없어 원핫인코딩을 수행할 수 없습니다.")
+            return df
         
-        return df
+        # 모델의 특성 이름 가져오기
+        model_features = self.model.feature_names_in_
+        
+        # 원핫인코딩 해야할 범주형 변수 목록
+        categorical_columns = [
+            'Gender', 
+            'MaritalStatus', 
+            'PreferredLoginDevice', 
+            'PreferredPaymentMode', 
+            'PreferedOrderCat'
+        ]
+        
+        # 모델에서 사용하는 모든 범주형 값을 추출
+        encoded_features = self.get_onehot_encoded_features()
+        st.write(f"🔍 디버그: 모델에서 사용하는 원핫인코딩 특성: {encoded_features}")
+        
+        # 새로운 데이터프레임 (원핫인코딩 결과를 담을 것임)
+        result_df = pd.DataFrame(index=df.index)
+        
+        # 범주형이 아닌 변수들 먼저 복사
+        for col in df.columns:
+            if col not in categorical_columns:
+                result_df[col] = df[col]
+        
+        # 범주형 변수 원핫인코딩 수행
+        for col in categorical_columns:
+            if col in df.columns and col in encoded_features:
+                value = df[col].iloc[0]  # 단일 행 데이터 가정
+                
+                # 현재 변수의 모든 원핫인코딩 컬럼 초기화 (0으로)
+                for encoded_col in encoded_features[col]:
+                    result_df[encoded_col] = 0
+                
+                # 현재 값에 해당하는 원핫인코딩 컬럼을 1로 설정
+                expected_col = f"{col}_{value}"
+                if expected_col in encoded_features[col]:
+                    result_df[expected_col] = 1
+                else:
+                    st.warning(f"🔍 디버그: '{col}'의 값 '{value}'에 해당하는 원핫인코딩 컬럼이 모델에 없습니다. 가능한 값: {[c.replace(f'{col}_', '') for c in encoded_features[col]]}")
+        
+        # 누락된 특성 확인 (모델에서 필요로 하는 특성이 전처리 후 데이터에 없는 경우)
+        missing_features = set(model_features) - set(result_df.columns)
+        if missing_features:
+            st.warning(f"🔍 디버그: 전처리 후 누락된 특성 {len(missing_features)}개: {list(missing_features)[:5]}...")
+            
+            # 누락된 특성을 0으로 채움
+            for feature in missing_features:
+                result_df[feature] = 0
+        
+        # 불필요한 특성 제거 (모델에서 사용하지 않는 특성)
+        extra_features = set(result_df.columns) - set(model_features)
+        if extra_features:
+            st.warning(f"🔍 디버그: 모델에서 사용하지 않는 특성 {len(extra_features)}개: {list(extra_features)[:5]}...")
+            result_df = result_df.drop(columns=list(extra_features))
+        
+        # 모델에서 사용하는 순서대로 특성 정렬
+        result_df = result_df[model_features]
+        
+        # 디버그 출력 추가
+        st.write(f"🔍 디버그: 데이터 전처리 완료 - 컬럼 수: {len(result_df.columns)}")
+        st.write(f"🔍 디버그: 원핫인코딩 후 컬럼 샘플: {list(result_df.columns)[:5]}...")
+        
+        return result_df
     
     def get_onehot_encoded_features(self):
         """
