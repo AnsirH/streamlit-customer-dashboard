@@ -42,18 +42,18 @@ if st.button("🧠 이탈 예측하기"):
 
     # 🔧 평균값 기반 기본값 설정
     default_values = {
-        'CityTier': 2,
-        'WarehouseToHome': 20.0,
-        'NumberOfDeviceRegistered': 2,
-        'NumberOfAddress': 1,
-        'OrderAmountHikeFromlastYear': 10.0,
-        'CouponUsed': 2,
-        'CashbackAmount': 150.0,
+        'CityTier': 3,  # 낮은 도시 접근성
+        'WarehouseToHome': 50.0,
+        'NumberOfDeviceRegistered': 1,
+        'NumberOfAddress': 0,
+        'OrderAmountHikeFromlastYear': -20.0,  # 주문 하락
+        'CouponUsed': 0,  # 쿠폰 사용 안 함
+        'CashbackAmount': 0,
         'PreferredLoginDevice_Mobile Phone': 1,
-        'PreferredPaymentMode_Credit Card': 1,
-        'Gender_Male': 1,
-        'PreferedOrderCat_Mobile': 1,
-        'MaritalStatus_Single': 1
+        'PreferredPaymentMode_UPI': 1,  # 불편 결제
+        'Gender_Male': 0,
+        'PreferedOrderCat_Grocery': 1,
+        'MaritalStatus_Married': 1
     }
 
     # 모델 피처 순서 정의
