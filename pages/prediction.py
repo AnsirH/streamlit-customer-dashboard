@@ -449,11 +449,11 @@ def show():
                     
                     # 영향 요인 계산 (모델 기반)
                     feature_importance = predictor.get_feature_importance()
-                    if feature_importance:
+                    if feature_importance and isinstance(feature_importance, dict):
                         # 특성 중요도를 리스트로 변환
                         factors = [
                             {"name": column_korean_names.get(feature, feature), 
-                             "value": importance, 
+                             "value": float(importance), 
                              "weight": 1.0,  # 이미 중요도에 가중치가 반영되어 있음
                              "description": f"{column_korean_names.get(feature, feature)}이(가) 이탈 확률에 영향을 미칩니다."}
                             for feature, importance in feature_importance.items()

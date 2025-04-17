@@ -184,6 +184,15 @@ class ChurnPredictor:
         if self.feature_importance_cache is None:
             # 특성 중요도가 계산되지 않았다면 기본값 반환
             return self._default_feature_importance()
+            
+        # 특성 중요도가 배열 형태인 경우 사전 형태로 변환
+        if isinstance(self.feature_importance_cache, np.ndarray):
+            # 특성 이름이 없는 경우 기본 이름 사용
+            features = {}
+            for i, val in enumerate(self.feature_importance_cache):
+                features[f'feature_{i+1}'] = float(val)
+            return features
+            
         return self.feature_importance_cache
 
 
