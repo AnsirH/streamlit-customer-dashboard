@@ -551,7 +551,7 @@ class ChurnPredictor2:
     def __init__(self, model_path=None, external_model=None):
         """모델 로드 또는 외부 주입"""
         self.model = external_model
-        self.model_path = model_path or (Path(__file__).parent / "xgb_best_model.pkl")
+        self.model_path = model_path or (Path(__file__).parent / "xgboost_best_model.pkl")
         self.feature_importance_cache = None
 
         if self.model is None:
