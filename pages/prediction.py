@@ -40,6 +40,49 @@ def show():
     
     # 앱 시작
     st.title("고객 이탈 예측")
+    
+    # 모델 특성 확인 (디버그용)
+    with st.expander("모델 특성 확인"):
+        predictor = ChurnPredictor()
+        if predictor.model is not None and hasattr(predictor.model, 'feature_names_in_'):
+            st.write("### 모델이 사용하는 특성 이름 목록")
+            feature_names = predictor.model.feature_names_in_
+            
+            # 원핫인코딩된 특성 그룹 분석
+            encoded_features = predictor.get_onehot_encoded_features()
+            
+            # 원핫인코딩된 특성 그룹 표시
+            st.write("### 원핫인코딩 된 특성 그룹")
+            if encoded_features:
+                total_encoded = sum(len(cols) for cols in encoded_features.values())
+                st.write(f"원본 변수 {len(encoded_features)}개가 원핫인코딩되어 총 {total_encoded}개 변수로 확장됨")
+                
+                for prefix, columns in encoded_features.items():
+                    with st.expander(f"{prefix} → {len(columns)}개 변수"):
+                        # 예상되는 원본 값 추출 (접두사 제거)
+                        original_values = [col.replace(f"{prefix}_", "") for col in columns]
+                        st.write("예상되는 원본 값들:", ", ".join(sorted(original_values)))
+                        st.write("원핫인코딩된 컬럼들:", sorted(columns))
+            else:
+                st.warning("원핫인코딩된 특성을 찾을 수 없습니다.")
+            
+            # 전체 특성 목록
+            st.write("### 전체 특성 목록")
+            non_encoded = [f for f in sorted(feature_names) if not any(f in cols for cols in encoded_features.values())]
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("원핫인코딩 되지 않은 특성:")
+                st.write(non_encoded)
+            
+            with col2:
+                st.write("특성 수 요약:")
+                st.write(f"- 총 특성 수: {len(feature_names)}")
+                st.write(f"- 원핫인코딩 특성 수: {total_encoded if encoded_features else 0}")
+                st.write(f"- 일반 특성 수: {len(non_encoded)}")
+        else:
+            st.error("모델이 로드되지 않았거나 feature_names_in_ 속성이 없습니다.")
+    
     st.write("고객 정보를 입력하여 이탈 가능성을 예측해보세요.")
 
     # 입력 컬럼 정의 (+ CustomerID 추가, Churn 제외)
@@ -508,9 +551,60 @@ def show():
                         debug_tabs = st.tabs(["입력 데이터", "모델 정보", "예측 과정", "로그"])
                         
                         with debug_tabs[0]:
-                            st.write("### 처리된 입력 데이터")
-                            st.dataframe(input_df)
                             st.write("### 원본 입력 데이터")
+                            st.dataframe(input_df)
+                            
+                            # 전처리 과정 확인을 위해 전처리 함수 직접 호출
+                            processed_df = predictor._preprocess_data(input_df)
+                            st.write("### 전처리 후 데이터 (원핫인코딩 적용)")
+                            st.dataframe(processed_df)
+                            
+                            # 원핫인코딩 정보 표시
+                            encoded_features = predictor.get_onehot_encoded_features()
+                            
+                            st.write("### 원핫인코딩 변환 정보")
+                            if encoded_features:
+                                # 범주형 변수별로 원본 값과 변환된 값 표시
+                                for prefix, columns in encoded_features.items():
+                                    with st.expander(f"{prefix} 변수의 원핫인코딩"):
+                                        # 입력 데이터에서 해당 변수 값 확인
+                                        if prefix in input_df.columns:
+                                            original_value = input_df[prefix].iloc[0]
+                                            st.write(f"입력값: {original_value}")
+                                            
+                                            # 변환 후 데이터에서 해당 원핫인코딩 컬럼들 값 확인
+                                            encoded_values = {}
+                                            for col in columns:
+                                                if col in processed_df.columns:
+                                                    encoded_values[col] = processed_df[col].iloc[0]
+                                            
+                                            encoded_df = pd.DataFrame([encoded_values])
+                                            st.write("원핫인코딩 결과:")
+                                            st.dataframe(encoded_df.T)  # 전치하여 보기 좋게 표시
+                            
+                            st.write("### 컬럼 변환 정보")
+                            st.write(f"- 원본 입력 컬럼 수: {len(input_df.columns)}")
+                            st.write(f"- 전처리 후 컬럼 수: {len(processed_df.columns)}")
+                            st.write(f"- 차이: {len(processed_df.columns) - len(input_df.columns)}개 컬럼 추가됨")
+                            
+                            if hasattr(predictor.model, 'feature_names_in_'):
+                                expected_columns = set(predictor.model.feature_names_in_)
+                                actual_columns = set(processed_df.columns)
+                                
+                                # 모델과 입력 데이터의 컬럼 일치 여부 확인
+                                if expected_columns == actual_columns:
+                                    st.success("✅ 모델이 기대하는 컬럼과 전처리 후 컬럼이 정확히 일치합니다.")
+                                else:
+                                    st.error("❌ 모델이 기대하는 컬럼과 전처리 후 컬럼이 일치하지 않습니다.")
+                                    missing = expected_columns - actual_columns
+                                    extra = actual_columns - expected_columns
+                                    
+                                    if missing:
+                                        st.write("누락된 컬럼:", missing)
+                                    if extra:
+                                        st.write("추가된 컬럼:", extra)
+                            
+                            st.write("### JSON 형식 입력 데이터")
                             st.json(input_data)
                         
                         with debug_tabs[1]:
