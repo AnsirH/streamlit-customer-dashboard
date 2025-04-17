@@ -124,49 +124,6 @@ class ChurnPredictor:
         if 'Complain' in df.columns and isinstance(df['Complain'].iloc[0], str):
             df['Complain'] = df['Complain'].apply(lambda x: 1 if x == '예' else 0)
         
-        # 원핫인코딩이 필요한 범주형 특성 리스트
-        categorical_features = [
-            'PreferredLoginDevice', 'PreferredPaymentMode', 'Gender', 
-            'PreferedOrderCat', 'MaritalStatus'
-        ]
-        
-        # 원핫인코딩 변환
-        for feature in categorical_features:
-            if feature in df.columns:
-                try:
-                    # 원핫인코딩 수행
-                    dummies = pd.get_dummies(df[feature], prefix=feature, drop_first=False)
-                    
-                    # 원본 컬럼 삭제 후 인코딩 결과 합치기
-                    df = df.drop(feature, axis=1)
-                    df = pd.concat([df, dummies], axis=1)
-                except Exception as e:
-                    logger.error(f"원핫인코딩 오류 ({feature}): {str(e)}")
-        
-        # 모델이 기대하는 모든 컬럼이 있는지 확인하고 누락된 컬럼은 0으로 채움
-        if hasattr(self.model, 'feature_names_in_'):
-            expected_columns = set(self.model.feature_names_in_)
-            current_columns = set(df.columns)
-            
-            # 누락된 컬럼 (모델에 필요하지만 현재 데이터에 없는 컬럼)
-            missing_columns = expected_columns - current_columns
-            
-            # 불필요한 컬럼 (현재 데이터에 있지만, 모델에 필요없는 컬럼)
-            extra_columns = current_columns - expected_columns
-            
-            # 누락된 컬럼 추가
-            for col in missing_columns:
-                df[col] = 0
-                logger.info(f"누락된 컬럼 추가: {col}")
-            
-            # 불필요한 컬럼 제거
-            if extra_columns:
-                df = df.drop(extra_columns, axis=1)
-                logger.info(f"불필요한 컬럼 제거: {extra_columns}")
-            
-            # 모델이 기대하는 컬럼 순서로 정렬
-            df = df[self.model.feature_names_in_]
-        
         return df
     
     def _compute_feature_importance(self, input_data):
@@ -221,30 +178,6 @@ class ChurnPredictor:
         default_importance = np.array([0.25, 0.22, 0.18, 0.15, 0.12, 0.08])
         self.feature_importance_cache = default_importance
         return default_importance
-    
-    def get_onehot_encoded_features(self):
-        """
-        모델에서 원핫인코딩된 특성들을 분석하여 그룹별로 반환합니다.
-        
-        Returns:
-            dict: 원본 변수명을 키로, 원핫인코딩된 컬럼 목록을 값으로 가지는 딕셔너리
-        """
-        if self.model is None or not hasattr(self.model, 'feature_names_in_'):
-            return {}
-            
-        feature_names = self.model.feature_names_in_
-        encoded_features = {}
-        
-        # 원핫인코딩된 컬럼들을 원본 변수별로 그룹화
-        for name in feature_names:
-            if '_' in name:
-                prefix = name.split('_')[0]
-                if prefix not in encoded_features:
-                    encoded_features[prefix] = []
-                encoded_features[prefix].append(name)
-        
-        # 하나의 값만 있는 경우는 원핫인코딩이 아닐 수 있으므로 필터링
-        return {prefix: columns for prefix, columns in encoded_features.items() if len(columns) > 1}
     
     def get_feature_importance(self):
         """캐시된 특성 중요도를 반환합니다."""
