@@ -488,7 +488,13 @@ class ChurnPredictor:
     
     def get_feature_importance(self):
         """계산된 특성 중요도를 반환합니다."""
-        return self.feature_importance_cache
+        if self.feature_importance_cache is None:
+            return None, None
+            
+        # 딕셔너리를 두 개의 리스트로 변환
+        features = list(self.feature_importance_cache.keys())
+        importances = list(self.feature_importance_cache.values())
+        return features, importances
 
 # 게이지 차트 생성
 def create_churn_gauge(value):
