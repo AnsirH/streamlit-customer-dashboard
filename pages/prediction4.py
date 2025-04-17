@@ -6,6 +6,14 @@ from pathlib import Path
 import uuid
 import sys
 
+# 안전한 숫자 입력을 위한 함수
+def safe_float(value, minimum=0.0, fallback=0.0):
+    try:
+        val = float(value)
+        return val if val >= minimum else fallback
+    except:
+        return fallback
+
 # 경로 설정
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -135,7 +143,9 @@ if uploaded_file:
     # 줄 별 입력 구성
     updated_values["이용 기간"] = rows[0][0].number_input("이용 기간 (개월)", min_value=0, value=int(selected_row["이용 기간"]))
     updated_values["거주 도시 등급"] = rows[0][1].selectbox("거주 도시 등급 (1~3)", [1, 2, 3], index=int(selected_row["거주 도시 등급"]) - 1)
-    updated_values["창고-집 거리"] = rows[0][2].number_input("창고-집 거리 (km)", min_value=0.0, value=float(selected_row["창고-집 거리"]))
+    updated_values["창고-집 거리"] = rows[0][2].number_input(
+    "창고-집 거리 (km)", min_value=0.0, value=safe_float(selected_row["창고-집 거리"])
+)
 
     updated_values["앱 사용 시간"] = rows[1][0].number_input("앱 사용 시간 (시간)", min_value=0.0, value=float(selected_row["앱 사용 시간"]))
     updated_values["등록된 기기 수"] = rows[1][1].number_input("등록된 기기 수", min_value=0, value=int(selected_row["등록된 기기 수"]))
