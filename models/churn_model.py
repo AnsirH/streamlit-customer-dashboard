@@ -577,27 +577,37 @@ class ChurnPredictor2:
             return False
 
     def predict(self, input_df: pd.DataFrame):
-        """예측 수행"""
         if self.model is None:
             self.load_model()
         if self.model is None:
+            st.warning("❗ [DEBUG] 모델이 존재하지 않아 기본값 반환됨")
             return self._default_prediction()
 
         try:
             processed_df = self._preprocess_data(input_df)
+
+            # ✅ 디버깅용 출력
+            st.write("✅ [DEBUG] 전처리 후 데이터:", processed_df)
+            st.write("✅ [DEBUG] 전처리 컬럼 수:", processed_df.shape[1])
+
             y_pred = self.model.predict(processed_df)
             y_proba = self.model.predict_proba(processed_df)[:, 1]
 
+            st.write("✅ [DEBUG] 예측 확률:", y_proba)
+
             if len(y_proba) == 0:
+                st.warning("❗ [DEBUG] 예측 확률이 비어 있음, 기본값 반환")
                 return self._default_prediction()
 
-            self.feature_importance_cache = None  # 중요도 초기화
+            self.feature_importance_cache = None
             self._compute_feature_importance(processed_df)
 
             return y_pred, y_proba
         except Exception as e:
             logger.error(f"❌ 예측 오류: {str(e)}")
+            st.error(f"❌ [DEBUG] 예측 중 오류: {e}")
             return self._default_prediction()
+
 
     def _default_prediction(self):
         """모델 실패 시 기본 반환"""

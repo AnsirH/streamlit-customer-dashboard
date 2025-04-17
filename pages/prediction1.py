@@ -53,6 +53,14 @@ if st.button("🧠 이탈 예측하기"):
         # 예측 수행
         y_pred, y_proba = predictor.predict(input_df)
         prob_pct = float(y_proba[0]) * 100
+        
+        ### 디버깅 코드
+        st.subheader("[디버깅] 예측 상태 확인")
+        st.write("🔍 모델 타입:", type(predictor.model))
+        st.write("🔍 입력 데이터프레임:", input_df)
+        st.write("🔍 입력 컬럼 수:", input_df.shape[1])
+        st.write("🔍 예측 확률 결과:", y_proba)
+        st.write("🔍 확률 %:", prob_pct)
 
         # 📈 게이지 차트 출력
         st.header("2️⃣ 이탈 확률 예측 결과")
@@ -92,3 +100,8 @@ if st.button("🧠 이탈 예측하기"):
 
     except Exception as e:
         st.error(f"❌ 예측 오류 발생: {str(e)}")
+
+# 예측 수행
+y_pred, y_proba = predictor.predict(input_df)
+prob_pct = float(y_proba[0]) * 100
+
