@@ -12,12 +12,12 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("⬇️ **스크롤**")
 
 st.markdown("""
-<div style="font-size:40px; font-weight:bold; color:#4B8BBE; 
-            background-color:#f0f0f0; padding:10px 20px; border-radius:10px;
-            display:inline-block; box-shadow:2px 2px 5px rgba(0,0,0,0.1);">
-    📊 고객 분석 대시보드
+<div style="text-align:center; font-size:36px; font-weight:bold;
+            color:#FF6B6B; margin-bottom:20px;">
+    🚀 이탈 예측 대시보드
 </div>
 """, unsafe_allow_html=True)
+
 
 
 st.subheader("선택한 고객 ID: **a500**")
