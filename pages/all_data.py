@@ -85,10 +85,15 @@ def show():
     
     # 수치형 변수들 간의 상관관계
     numeric_cols = ['Tenure', 'HourSpendOnApp', 'OrderCount', 'CashbackAmount', 'SatisfactionScore']
-    correlation = df[numeric_cols].corr()
+    correlation = df[numeric_cols].corr().round(2)  # 소수점 둘째 자리까지 반올림
     
     # 상관관계 히트맵
-    st.plotly_chart(
-        Visualizer.create_correlation_heatmap(correlation),
-        use_container_width=True
-    ) 
+    try:
+        st.plotly_chart(
+            Visualizer.create_correlation_heatmap(correlation),
+            use_container_width=True
+        )
+    except Exception as e:
+        st.error(f"상관관계 히트맵 생성 중 오류가 발생했습니다: {str(e)}")
+        st.write("상관관계 행렬:")
+        st.dataframe(correlation) 
