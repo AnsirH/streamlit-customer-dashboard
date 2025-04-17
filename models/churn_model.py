@@ -38,9 +38,13 @@ class ChurnPredictor:
             
             self.model = joblib.load(self.model_path)
             logger.info(f"모델 로드 성공: {self.model_path}")
+            # 디버그 출력 추가
+            st.write(f"🔍 디버그: 모델 로드 성공 - {self.model_path}")
             return True
         except Exception as e:
             logger.error(f"모델 로드 실패: {str(e)}")
+            # 디버그 출력 추가
+            st.error(f"🔍 디버그: 모델 로드 실패 - {str(e)}")
             return False
     
     def predict(self, input_df):
