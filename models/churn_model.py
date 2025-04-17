@@ -204,7 +204,7 @@ class ChurnPredictor:
 # ===============================
 # ✅ 모델 로드 및 예측 함수
 # ===============================
-MODEL_PATH = Path(__file__).parent / "xgb_best_model.pkl"
+MODEL_PATH = Path(__file__).parent / "xgboost_best_model.pkl"
 
 def load_churn_model(model_path: str = None):
     """
