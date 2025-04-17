@@ -122,13 +122,23 @@ class Visualizer:
     @staticmethod
     def create_correlation_heatmap(correlation_matrix):
         """상관관계 히트맵을 생성합니다."""
+        # 상관관계 행렬이 DataFrame인 경우 numpy 배열로 변환
+        if isinstance(correlation_matrix, pd.DataFrame):
+            z = correlation_matrix.values
+            x = correlation_matrix.columns.tolist()
+            y = correlation_matrix.index.tolist()
+        else:
+            z = correlation_matrix
+            x = list(range(correlation_matrix.shape[1]))
+            y = list(range(correlation_matrix.shape[0]))
+        
         fig = go.Figure(data=go.Heatmap(
-            z=correlation_matrix,
-            x=correlation_matrix.columns,
-            y=correlation_matrix.columns,
+            z=z,
+            x=x,
+            y=y,
             colorscale='RdBu',
             zmid=0,
-            text=np.round(correlation_matrix, 2),
+            text=np.round(z, 2),
             texttemplate="%{text}",
             textfont={"size": 10}
         ))
