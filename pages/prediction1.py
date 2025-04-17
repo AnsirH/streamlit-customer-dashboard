@@ -92,6 +92,20 @@ class ChurnPredictor:
                 y_pred = self.model.predict(processed_df)
                 y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
                 
+                # 디버그: 원시 예측값 출력
+                with st.expander("디버그: 원시 예측값"):
+                    st.write("예측 클래스:", y_pred)
+                    st.write("예측 확률 (원시값):", y_proba)
+                    # 예측값이 너무 낮은 경우 경고
+                    if y_proba[0] < 0.05:
+                        st.warning("⚠️ 예측된 이탈 확률이 매우 낮습니다. 이는 다음과 같은 이유로 발생할 수 있습니다:")
+                        st.write("1. 입력된 고객 데이터가 실제로 이탈 위험이 낮은 경우")
+                        st.write("2. 모델이 대부분의 케이스를 낮은 확률로 예측하도록 학습된 경우")
+                        st.write("3. 데이터 전처리 과정에서 원핫인코딩 등의 문제가 있는 경우")
+                        
+                        # 위험도 높은 구성으로 변경 제안
+                        st.info("테스트를 위해 '낮은 만족도(1)', '적은 주문 횟수(1)', '오래된 마지막 주문(90일+)' 등의 조합으로 시도해보세요.")
+                
                 # 특성 중요도 계산
                 self._compute_feature_importance(processed_df)
                 
@@ -462,24 +476,24 @@ def show():
     # 기본값
     default_values = {
         'customer_id': f'CUST-{np.random.randint(10000, 99999)}',
-        'tenure': 12,
+        'tenure': 2,  # 짧은 거래기간
         'preferred_login_device': 'Mobile',
-        'city_tier': 1,
-        'warehouse_to_home': 20,
-        'preferred_payment_method': 'Credit Card',
+        'city_tier': 3,  # 높은 도시등급
+        'warehouse_to_home': 35,  # 멀리 떨어진 위치
+        'preferred_payment_method': 'Cash on Delivery',  # 현금 결제
         'gender': 'Male',
-        'hour_spend_on_app': 3.0,
-        'number_of_device_registered': 2,
-        'preferred_order_category': 'Electronics',
-        'satisfaction_score': 3,
+        'hour_spend_on_app': 0.5,  # 적은 앱 사용시간
+        'number_of_device_registered': 1,
+        'preferred_order_category': 'Grocery',  # 식료품 카테고리
+        'satisfaction_score': 2,  # 낮은 만족도
         'marital_status': 'Single',
-        'number_of_address': 2,
-        'complain': '아니오',
-        'order_amount_hike': 15.0,
-        'coupon_used': 3,
-        'order_count': 10,
-        'days_since_last_order': 15,
-        'cashback_amount': 150.0
+        'number_of_address': 1,
+        'complain': '예',  # 불만 있음
+        'order_amount_hike': -5.0,  # 주문액 감소
+        'coupon_used': 0,  # 쿠폰 미사용
+        'order_count': 2,  # 적은 주문수
+        'days_since_last_order': 60,  # 오래된 마지막 주문
+        'cashback_amount': 10.0  # 적은 캐시백
     }
     
     # 입력 폼 생성
