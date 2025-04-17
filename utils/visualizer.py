@@ -2,6 +2,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 from config import VIZ_CONFIG
+import numpy as np
 
 class Visualizer:
     @staticmethod
@@ -25,6 +26,11 @@ class Visualizer:
                 ]
             }
         ))
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white')
+        )
         return fig
 
     @staticmethod
@@ -37,6 +43,11 @@ class Visualizer:
             title=title,
             orientation=orientation,
             color_discrete_sequence=[VIZ_CONFIG['colors']['medium_risk']]
+        )
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white')
         )
         return fig
 
@@ -67,7 +78,10 @@ class Visualizer:
         fig.update_layout(
             title=title,
             barmode='relative',
-            showlegend=False
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white')
         )
         
         return fig
@@ -97,38 +111,35 @@ class Visualizer:
     @staticmethod
     def create_risk_distribution(data, column='churn_probability'):
         """이탈 위험도 분포 시각화"""
-        fig = go.Figure()
-        
-        # 위험도 구간별 색상 설정
-        colors = [
-            VIZ_CONFIG['colors']['low_risk'],
-            VIZ_CONFIG['colors']['medium_risk'],
-            VIZ_CONFIG['colors']['high_risk']
-        ]
-        
-        fig.add_trace(go.Histogram(
-            x=data[column],
-            nbinsx=30,
-            marker_color=colors[0],
-            name='이탈 위험도 분포'
+        fig = px.histogram(data, x=column, nbins=20, title='이탈 위험도 분포')
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white')
+        )
+        return fig
+
+    @staticmethod
+    def create_correlation_heatmap(correlation_matrix):
+        """상관관계 히트맵을 생성합니다."""
+        fig = go.Figure(data=go.Heatmap(
+            z=correlation_matrix,
+            x=correlation_matrix.columns,
+            y=correlation_matrix.columns,
+            colorscale='RdBu',
+            zmid=0,
+            text=np.round(correlation_matrix, 2),
+            texttemplate="%{text}",
+            textfont={"size": 10}
         ))
         
-        # 임계값 선 추가
-        for threshold, color in zip(
-            [VIZ_CONFIG['thresholds']['low'], VIZ_CONFIG['thresholds']['medium']],
-            colors[1:]
-        ):
-            fig.add_vline(
-                x=threshold,
-                line_dash="dash",
-                line_color=color,
-                annotation_text=f"임계값: {threshold:.2f}"
-            )
-        
         fig.update_layout(
-            title="이탈 위험도 분포",
-            xaxis_title="이탈 확률",
-            yaxis_title="고객 수"
+            title='상관관계 히트맵',
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white'),
+            xaxis=dict(tickangle=45),
+            yaxis=dict(tickangle=0)
         )
         
         return fig 
