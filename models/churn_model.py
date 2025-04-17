@@ -18,14 +18,21 @@ logger = setup_logger(__name__)
 class ChurnPredictor:
     """고객 이탈 예측을 위한 모델 클래스"""
     
-    def __init__(self, model_path=None):
-        """모델을 로드하고 초기화합니다."""
+    def __init__(self, model_path=None, ignore_unknown_values=True):
+        """모델을 로드하고 초기화합니다.
+        
+        Args:
+            model_path (str, optional): 모델 파일 경로. 기본값은 None.
+            ignore_unknown_values (bool, optional): 모델이 인식하지 못하는 범주값이 있을 때 해당 특성을 무시할지 여부. 기본값은 True.
+        """
         self.model = None
         if model_path is None:
-            self.model_path = Path(__file__).parent / "xgb_best_model.pkl"
+            self.model_path = Path(__file__).parent / "xgboost_best_model.pkl"
         else:
             self.model_path = model_path
         self.feature_importance_cache = None  # 특성 중요도 캐시 추가
+        self.ignore_unknown_values = True  # 항상 알 수 없는 값을 무시하도록 설정
+        
         try:
             self.load_model()
         except Exception as e:
@@ -58,30 +65,43 @@ class ChurnPredictor:
             input_df (pandas.DataFrame): 예측할 고객 데이터
             
         Returns:
-            tuple: (예측 클래스, 이탈 확률)
+            tuple: (예측 클래스, 이탈 확률) 또는 오류 발생 시 (None, None)
         """
         try:
-            # 모델이 없으면 로드 시도
-            if self.model is None:
-                self.load_model()
+            # 1. 입력 데이터 검증
+            if input_df is None or len(input_df) == 0:
+                st.error("⚠️ 예측할 데이터가 없습니다.")
+                return None, None
                 
-            # 모델 로드 실패 시 기본값 반환
+            # 2. 모델 검증
             if self.model is None:
-                return self._default_prediction()
+                st.error("⚠️ 모델이 로드되지 않았습니다.")
+                if self.load_model() is False:
+                    return None, None
             
-            # 데이터 전처리
+            # 3. 입력 데이터의 범주형 변수 값이 모델과 호환되는지 미리 검증
+            safe_prediction, unknown_values = self._validate_categorical_values(input_df)
+            
+            # 4. 모델이 인식하지 못하는 범주값이 있는 경우
+            if not safe_prediction:
+                # 경고 표시 후 계속 진행
+                st.warning("⚠️ 모델이 인식하지 못하는 범주값이 있습니다.")
+                for cat, values in unknown_values.items():
+                    st.warning(f"- '{cat}' 변수에 알 수 없는 값: {values} (이 특성은 무시됩니다)")
+            
+            # 5. 데이터 전처리
             processed_df = self._preprocess_data(input_df)
             
-            # 예측 수행
+            # 6. 예측 수행
             try:
                 y_pred = self.model.predict(processed_df)
                 y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
                 
-                # 예측 결과 확인
-                if len(y_proba) == 0:
-                    return self._default_prediction()
+                # 7. 불확실성 정보 추가 (모델이 인식하지 못하는 범주값이 있는 경우)
+                if not safe_prediction:
+                    st.warning("⚠️ 일부 특성이 무시되어 예측 결과가 부정확할 수 있습니다.")
                 
-                # 성공적으로 예측한 경우 특성 중요도 계산
+                # 8. 예측 성공 시 특성 중요도 계산 (선택 사항)
                 try:
                     self._compute_feature_importance(processed_df)
                 except Exception as e:
@@ -89,42 +109,357 @@ class ChurnPredictor:
                     pass
                 
                 return y_pred, y_proba
-            except Exception as e:
-                logger.error(f"예측 오류: {str(e)}")
-                return self._default_prediction()
                 
+            except Exception as e:
+                st.error(f"⚠️ 예측 수행 중 오류: {str(e)}")
+                return None, None
+        
         except Exception as e:
-            logger.error(f"예측 처리 중 오류: {str(e)}")
-            return self._default_prediction()
+            st.error(f"⚠️ 예측 처리 중 오류: {str(e)}")
+            import traceback
+            st.write(f"🔍 [예측 오류]: {traceback.format_exc()}")
+            return None, None
     
-    def _default_prediction(self):
-        """기본 예측값 반환"""
-        return np.array([0]), np.array([0.5])
-    
-    def _preprocess_data(self, input_df):
+    def _validate_categorical_values(self, input_df):
         """
-        입력 데이터를 전처리합니다.
+        입력 데이터의 범주형 변수 값이 모델과 호환되는지 검증합니다.
         
         Args:
-            input_df (pandas.DataFrame): 원본 입력 데이터
+            input_df (pd.DataFrame): 검증할 입력 데이터
             
         Returns:
-            pandas.DataFrame: 전처리된 데이터
+            tuple: (안전한 예측 여부, 알 수 없는 값 목록)
         """
-        # 입력 데이터 복사
-        df = input_df.copy()
+        # 1. 기본값 설정
+        is_safe = True
+        unknown_values = {}
         
-        # CustomerID 제거 (예측에 사용되지 않음)
-        columns_to_remove = ['CustomerID', 'customer_id', 'cust_id', 'id']
-        for col in columns_to_remove:
-            if col in df.columns:
-                df = df.drop(col, axis=1)
+        # 2. 모델이 없는 경우 검증 불가
+        if self.model is None or not hasattr(self.model, 'feature_names_in_'):
+            return True, {}  # 검증 불가하므로 안전하다고 가정
+            
+        # 3. 원핫인코딩된 특성 구조 가져오기
+        encoded_features = self.get_onehot_encoded_features()
         
-        # Complain 불리언 변환 (예/아니오 -> 0/1)
-        if 'Complain' in df.columns and isinstance(df['Complain'].iloc[0], str):
-            df['Complain'] = df['Complain'].apply(lambda x: 1 if x == '예' else 0)
+        # 4. 각 범주형 변수별 가능한 값 목록 추출
+        category_values = {}
+        for prefix, features in encoded_features.items():
+            category_values[prefix] = [f.split('_', 1)[1] for f in features]
         
-        return df
+        # 5. 입력 데이터의 각 범주형 변수 검증
+        for prefix in encoded_features.keys():
+            if prefix in input_df.columns:
+                # 5.1 입력 데이터의 해당 컬럼 고유값 가져오기
+                input_values = input_df[prefix].astype(str).str.strip().unique()
+                
+                # 5.2 모델이 인식하지 못하는 값 찾기
+                possible_values = [str(v).lower() for v in category_values.get(prefix, [])]
+                unknown = [val for val in input_values 
+                          if str(val).lower() not in possible_values]
+                
+                # 5.3 알 수 없는 값이 있으면 기록
+                if unknown:
+                    is_safe = False
+                    unknown_values[prefix] = unknown
+        
+        return is_safe, unknown_values
+
+    def _preprocess_data(self, data):
+        """
+        모델 예측을 위해 입력 데이터를 전처리합니다.
+        모델이 요구하는 정확한 특성 구조와 일치하는 데이터를 생성합니다.
+        모델이 인식하지 못하는 범주값이 있는 특성은 무시합니다 (모든 원핫인코딩 컬럼을 0으로 설정).
+        
+        Args:
+            data (pd.DataFrame): 전처리할 입력 데이터
+            
+        Returns:
+            pd.DataFrame: 모델 입력에 맞게 전처리된 데이터
+        """
+        try:
+            # 1. 원본 데이터 로깅
+            st.write(f"🔍 [전처리]: 원본 데이터 크기: {data.shape}")
+            
+            # 2. 모델 확인
+            if self.model is None:
+                st.error("⚠️ 모델이 로드되지 않았습니다.")
+                return data.copy()
+                
+            if not hasattr(self.model, 'feature_names_in_'):
+                st.error("⚠️ 모델에 'feature_names_in_' 속성이 없습니다.")
+                return data.copy()
+            
+            # 3. 모델 특성 가져오기
+            model_features = list(self.model.feature_names_in_)
+            st.write(f"🔍 [전처리]: 모델 특성 수: {len(model_features)}")
+            
+            # 4. 원핫인코딩 구조 분석
+            encoded_features_dict = self.get_onehot_encoded_features()
+            
+            # 5. 범주형 변수 식별 (원핫인코딩된 특성에서 추출)
+            categorical_cols = list(encoded_features_dict.keys())
+            st.write(f"🔍 [전처리]: 원핫인코딩 대상 범주형 변수: {categorical_cols}")
+            
+            # 6. 각 범주형 변수별 가능한 값 목록 추출
+            category_values = {}
+            for prefix, features in encoded_features_dict.items():
+                category_values[prefix] = [f.split('_', 1)[1] for f in features]
+            
+            # 7. 새 결과 데이터프레임 생성 (모델이 필요로 하는 모든 특성을 포함하게 됨)
+            result_df = pd.DataFrame(index=data.index)
+            
+            # 8. 미리 모든 원핫인코딩 컬럼을 0으로 초기화
+            for feature in model_features:
+                result_df[feature] = 0
+            
+            # 9. 무시된 특성 정보 저장
+            ignored_features = {}
+            
+            # 10. 각 범주형 변수 처리
+            for prefix in categorical_cols:
+                if prefix in data.columns:
+                    # 10.1 입력 데이터에서 해당 컬럼 값 가져오기
+                    for idx, row in data.iterrows():
+                        # None 값 확인 및 처리
+                        input_value = row[prefix]
+                        if input_value is None:
+                            st.warning(f"⚠️ '{prefix}'의 값이 None입니다. 빈 문자열로 처리합니다.")
+                            input_value = ""
+                        
+                        # 문자열로 변환하고 공백 제거
+                        input_value = str(input_value).strip()
+                        
+                        # 'Complain' 컬럼 처리 (예/아니오 -> 1/0)
+                        if prefix == 'Complain' or prefix == 'complaint_status':
+                            if input_value.lower() in ['예', 'yes', 'y', 'true', '1']:
+                                input_value = '1'
+                            else:
+                                input_value = '0'
+                        
+                        # 10.2 해당 값에 대한 원핫인코딩 컬럼 이름 생성
+                        expected_col = f"{prefix}_{input_value}"
+                        
+                        # 10.3 해당 컬럼이 모델 특성에 존재하는지 확인
+                        col_exists = expected_col in model_features
+                        
+                        if col_exists:
+                            # 10.4 존재하는 경우 해당 컬럼을 1로 설정
+                            result_df.loc[idx, expected_col] = 1
+                        else:
+                            # 10.5 존재하지 않는 경우: 해당 특성 무시
+                            st.warning(f"⚠️ '{prefix}'의 값 '{input_value}'에 대한 원핫인코딩 컬럼이 모델에 없습니다.")
+                            ignored_features[prefix] = input_value
+                            st.write(f"✓ '{prefix}'의 값 '{input_value}'은(는) 무시됩니다.")
+            
+            # 11. 범주형이 아닌 일반 특성 처리
+            for feature in model_features:
+                # 원핫인코딩된 특성이 아닌 경우만 처리 (이미 위에서 처리되지 않은 경우)
+                if '_' not in feature and feature in data.columns:
+                    # None 값 확인 및 처리
+                    if data[feature].isnull().any():
+                        st.warning(f"⚠️ '{feature}'에 None 값이 있습니다. 0으로 대체합니다.")
+                        result_df[feature] = data[feature].fillna(0)
+                    else:
+                        result_df[feature] = data[feature]
+            
+            # 12. 디버깅: 무시된 특성 정보 출력
+            if ignored_features:
+                st.write("### ⚠️ 무시된 특성 정보")
+                for prefix, value in ignored_features.items():
+                    ohe_cols = [col for col in model_features if col.startswith(f"{prefix}_")]
+                    st.write(f"- '{prefix}'의 값 '{value}' 무시됨 (관련 컬럼 {len(ohe_cols)}개가 모두 0으로 설정됨)")
+                    if len(ohe_cols) <= 10:  # 컬럼 수가 적으면 모두 표시
+                        st.write(f"  - 관련 컬럼: {ohe_cols}")
+                    else:
+                        st.write(f"  - 관련 컬럼 일부: {ohe_cols[:5]}... (총 {len(ohe_cols)}개)")
+            
+            # 13. 결과 데이터 검증
+            if set(result_df.columns) != set(model_features):
+                st.error("⚠️ 생성된 특성이 모델 특성과 일치하지 않습니다!")
+                missing = set(model_features) - set(result_df.columns)
+                extra = set(result_df.columns) - set(model_features)
+                
+                if missing:
+                    st.write(f"- 누락된 특성: {list(missing)}")
+                if extra:
+                    st.write(f"- 추가된 특성: {list(extra)}")
+                    result_df = result_df.drop(columns=list(extra))
+                
+                # 누락된 특성 추가
+                for feat in missing:
+                    result_df[feat] = 0
+            
+            # 14. 모델 특성 순서에 맞게 재정렬
+            result_df = result_df[model_features]
+            
+            # 15. 각 범주형 변수별 활성화된 컬럼 확인
+            if len(data) == 1:  # 단일 레코드인 경우
+                for prefix in categorical_cols:
+                    if prefix in data.columns:
+                        # 현재 값 확인
+                        input_value = data[prefix].iloc[0]
+                        if input_value is None:
+                            input_value = ""
+                        
+                        # 이 범주형 변수에 해당하는 모든 원핫인코딩 컬럼
+                        ohe_cols = [col for col in result_df.columns if col.startswith(f"{prefix}_")]
+                        
+                        # 활성화된 컬럼 (값이 1인 컬럼)
+                        active_cols = [col for col in ohe_cols if result_df[col].iloc[0] == 1]
+                        
+                        if active_cols:
+                            # 활성화된 컬럼이 있는 경우
+                            active_values = [col.split('_', 1)[1] for col in active_cols]
+                            st.write(f"✓ '{prefix}': 입력값 '{input_value}' → 활성화된 값: {active_values}")
+                        else:
+                            # 활성화된 컬럼이 없는 경우 (무시된 경우)
+                            if prefix in ignored_features:
+                                st.write(f"✓ '{prefix}': 입력값 '{input_value}'은(는) 무시됨 (모든 컬럼이 0)")
+                            else:
+                                st.error(f"⚠️ '{prefix}'에 대해 활성화된 원핫인코딩 컬럼이 없습니다!")
+                                st.write(f"  - 원본 값: '{input_value}'")
+                                st.write(f"  - 가능한 값: {category_values.get(prefix, [])}")
+            
+            # 16. 전처리 완료
+            st.write(f"🔍 [전처리]: 데이터 처리 완료, 최종 크기: {result_df.shape}")
+            
+            # 17. NaN 값 확인 및 처리
+            if result_df.isnull().values.any():
+                st.warning("⚠️ 최종 데이터에 NaN 값이 있습니다. 0으로 대체합니다.")
+                result_df = result_df.fillna(0)
+                
+            # 18. 데이터 타입 확인 및 처리
+            for col in result_df.columns:
+                if result_df[col].dtype == 'object':
+                    st.warning(f"⚠️ '{col}' 컬럼이 object 타입입니다. 숫자로 변환합니다.")
+                    try:
+                        result_df[col] = pd.to_numeric(result_df[col], errors='coerce').fillna(0)
+                    except Exception as e:
+                        st.error(f"⚠️ '{col}' 컬럼 변환 실패: {str(e)}")
+                        result_df[col] = 0
+            
+            return result_df
+            
+        except Exception as e:
+            st.error(f"⚠️ 데이터 전처리 중 오류: {str(e)}")
+            import traceback
+            st.write(f"🔍 [전처리 오류]: {traceback.format_exc()}")
+            return data.copy()
+    
+    def get_onehot_encoded_features(self):
+        """
+        모델에서 사용하는 원핫인코딩된 특성 목록을 추출합니다.
+        
+        Returns:
+            dict: 범주형 변수별 원핫인코딩된 특성 목록 (예: {'Gender': ['Gender_Male', 'Gender_Female']})
+        """
+        # 1. 기본 검증
+        if self.model is None:
+            st.warning("⚠️ 모델이 없어 원핫인코딩 특성을 분석할 수 없습니다.")
+            return {}
+            
+        if not hasattr(self.model, 'feature_names_in_'):
+            st.warning("⚠️ 모델에 feature_names_in_ 속성이 없습니다.")
+            return {}
+        
+        # 2. 모델의 모든 특성 가져오기
+        all_features = list(self.model.feature_names_in_)
+        st.write(f"🔍 디버그 [원핫인코딩 분석]: 모델 전체 특성 수: {len(all_features)}")
+        
+        # 3. 모든 특성에서 접두사-값 패턴 찾기
+        pattern_features = []
+        for feature in all_features:
+            if '_' in feature:
+                pattern_features.append(feature)
+        
+        st.write(f"🔍 디버그 [원핫인코딩 분석]: '_'가 포함된 특성 수: {len(pattern_features)}")
+        
+        if not pattern_features:
+            st.warning("⚠️ 원핫인코딩 패턴을 가진 특성이 없습니다. 모델이 원핫인코딩을 사용하지 않을 수 있습니다.")
+            # 모델 특성 샘플 출력
+            st.write(f"🔍 디버그 [원핫인코딩 분석]: 모델 특성 샘플: {all_features[:10]}")
+            return {}
+        
+        # 4. 모든 접두사 추출 및 개수 카운트
+        prefix_counter = {}
+        for feature in pattern_features:
+            prefix = feature.split('_')[0]
+            if prefix not in prefix_counter:
+                prefix_counter[prefix] = []
+            prefix_counter[prefix].append(feature)
+        
+        # 5. 접두사별 통계 출력 (디버깅)
+        st.write(f"🔍 디버그 [원핫인코딩 분석]: 발견된 접두사: {list(prefix_counter.keys())}")
+        
+        # 6. 원핫인코딩으로 간주할 최소 변수 수 (적어도 2개 이상이어야 함)
+        min_variants = 2
+        
+        # 7. 원핫인코딩 변수 그룹화
+        encoded_features = {}
+        for prefix, features in prefix_counter.items():
+            if len(features) >= min_variants:
+                # 접두사가 일반적인 범주형 변수명인지 확인
+                is_valid_prefix = any(common in prefix.lower() for common in [
+                    'gender', 'sex', 'marital', 'city', 'status', 'login', 'device', 
+                    'payment', 'order', 'cat', 'category', 'type', 'satisfaction', 
+                    'education', 'income', 'occupation', 'complain'
+                ])
+                
+                if is_valid_prefix or len(features) >= 3:  # 잘 알려진 범주형 변수명이거나 3개 이상의 변형이 있는 경우
+                    encoded_features[prefix] = features
+                    category_values = [f.split('_', 1)[1] for f in features]
+                    
+                    st.write(f"✅ 디버그 [원핫인코딩 분석]: 범주형 변수 '{prefix}' 확인됨")
+                    st.write(f"  - 컬럼 수: {len(features)}")
+                    st.write(f"  - 범주값: {category_values}")
+        
+        # 8. 원핫인코딩 변수가 발견되지 않은 경우 
+        if not encoded_features:
+            st.warning("⚠️ 원핫인코딩 변수가 발견되지 않았습니다!")
+            
+            # 발견된 모든 접두사 정보 출력
+            for prefix, features in prefix_counter.items():
+                st.write(f"🔍 디버그 [원핫인코딩 분석]: 접두사 '{prefix}': {len(features)}개 컬럼")
+                if len(features) <= 5:  # 컬럼 수가 적은 경우 모두 표시
+                    st.write(f"  - 컬럼: {features}")
+                else:
+                    st.write(f"  - 컬럼 샘플: {features[:5]}...")
+            
+            # 특성명 구조 분석
+            uppercase_count = sum(1 for f in all_features if any(c.isupper() for c in f))
+            digit_count = sum(1 for f in all_features if any(c.isdigit() for c in f))
+            
+            st.write(f"🔍 디버그 [원핫인코딩 분석]: 대문자 포함 특성 수: {uppercase_count}")
+            st.write(f"🔍 디버그 [원핫인코딩 분석]: 숫자 포함 특성 수: {digit_count}")
+            
+            # 모델 내장 중요도 정보가 있다면 상위 특성 출력
+            if hasattr(self.model, 'feature_importances_'):
+                importances = self.model.feature_importances_
+                indices = np.argsort(importances)[-5:]  # 상위 5개
+                st.write("🔍 디버그 [원핫인코딩 분석]: 가장 중요한 특성 Top 5:")
+                for i in reversed(indices):
+                    st.write(f"  - {all_features[i]}: {importances[i]:.4f}")
+            
+            # 수동으로 몇 가지 범주형 변수 추가
+            st.write("🔍 디버그 [원핫인코딩 분석]: 일반적인 범주형 변수명 검색 중...")
+            common_categories = ['Gender', 'MaritalStatus', 'LoginDevice', 'PaymentMode', 'OrderCat']
+            
+            for category in common_categories:
+                matching = [f for f in all_features if category.lower() in f.lower()]
+                if matching:
+                    st.write(f"🔍 디버그 [원핫인코딩 분석]: '{category}' 관련 특성 발견: {len(matching)}개")
+                    st.write(f"  - 특성: {matching}")
+                    # 관련 특성이 발견되면 encoded_features에 추가
+                    encoded_features[category] = matching
+            
+            # 그래도 발견되지 않으면 언더스코어로 구분된 모든 특성 추가
+            if not encoded_features and pattern_features:
+                st.write("🔍 디버그 [원핫인코딩 분석]: 최후의 방법으로 모든 '_' 포함 특성을 사용합니다")
+                for prefix, features in prefix_counter.items():
+                    if len(features) >= min_variants:
+                        encoded_features[prefix] = features
+        
+        return encoded_features
     
     def _compute_feature_importance(self, input_data):
         """Calculate feature importance for a prediction."""
@@ -195,6 +530,134 @@ class ChurnPredictor:
             
         return self.feature_importance_cache
 
+    def get_model_features(self):
+        """
+        모델이 요구하는 특성(컬럼) 목록을 반환합니다.
+        
+        Returns:
+            dict: 모델 특성에 대한 상세 정보
+        """
+        if self.model is None:
+            st.error("⚠️ 모델이 로드되지 않았습니다.")
+            return {"error": "모델이 로드되지 않았습니다"}
+            
+        if not hasattr(self.model, 'feature_names_in_'):
+            st.error("⚠️ 모델에 feature_names_in_ 속성이 없습니다.")
+            return {"error": "모델에 feature_names_in_ 속성이 없습니다"}
+            
+        # 모델의 모든 특성
+        all_features = list(self.model.feature_names_in_)
+        
+        # 결과 정보 구성
+        result = {
+            "total_features": len(all_features),
+            "features": all_features,
+            "sample_features": all_features[:10] if len(all_features) > 10 else all_features
+        }
+        
+        # 원핫인코딩 특성 그룹화
+        encoded_features = self.get_onehot_encoded_features()
+        result["onehot_groups"] = len(encoded_features)
+        result["onehot_features"] = encoded_features
+        
+        # 원핫인코딩 되지 않은 특성
+        all_encoded = []
+        for group in encoded_features.values():
+            all_encoded.extend(group)
+        
+        non_encoded = [f for f in all_features if f not in all_encoded]
+        result["non_encoded_features"] = non_encoded
+        
+        # 특성 타입별 분류
+        has_underscore = [f for f in all_features if '_' in f]
+        has_digit = [f for f in all_features if any(c.isdigit() for c in f)]
+        has_uppercase = [f for f in all_features if any(c.isupper() for c in f)]
+        
+        result["has_underscore_count"] = len(has_underscore)
+        result["has_digit_count"] = len(has_digit)
+        result["has_uppercase_count"] = len(has_uppercase)
+        
+        # 중요도 정보가 있는 경우 
+        if hasattr(self.model, 'feature_importances_'):
+            importances = self.model.feature_importances_
+            top_indices = np.argsort(importances)[-10:]  # 상위 10개
+            top_features = [(all_features[i], float(importances[i])) for i in reversed(top_indices)]
+            result["top_features"] = top_features
+            
+        return result
+    
+    def print_model_features(self):
+        """
+        모델이 요구하는 특성 정보를 화면에 출력합니다.
+        """
+        features_info = self.get_model_features()
+        
+        if "error" in features_info:
+            st.error(features_info["error"])
+            return
+            
+        st.write("## 모델 특성 정보")
+        st.write(f"- 총 특성 수: {features_info['total_features']}")
+        
+        # 특성 샘플 표시
+        st.write("### 특성 샘플")
+        st.write(features_info["sample_features"])
+        
+        # 원핫인코딩 그룹 표시
+        st.write(f"### 원핫인코딩 그룹 ({features_info['onehot_groups']}개)")
+        
+        for group, features in features_info["onehot_features"].items():
+            values = [f.split('_', 1)[1] for f in features]
+            st.write(f"- **{group}**: {len(features)}개 값")
+            st.write(f"  - 값 목록: {values}")
+            
+        # 원핫인코딩 되지 않은 특성
+        if features_info["non_encoded_features"]:
+            st.write("### 원핫인코딩 되지 않은 특성")
+            st.write(features_info["non_encoded_features"])
+            
+        # 중요도 정보가 있는 경우
+        if "top_features" in features_info:
+            st.write("### 상위 10개 중요 특성")
+            for feature, importance in features_info["top_features"]:
+                st.write(f"- {feature}: {importance:.4f}")
+                
+        # 특성 형식 정보
+        st.write("### 특성 형식 정보")
+        st.write(f"- 언더스코어(_) 포함: {features_info['has_underscore_count']}개")
+        st.write(f"- 숫자 포함: {features_info['has_digit_count']}개")
+        st.write(f"- 대문자 포함: {features_info['has_uppercase_count']}개")
+
+    def set_ignore_unknown_values(self, ignore=True):
+        """
+        이 메서드는 더 이상 사용되지 않습니다.
+        모델은 항상 인식하지 못하는 범주값이 있는 특성을 무시합니다.
+        """
+        st.info("✓ 모델은 항상 인식하지 못하는 범주값이 있는 특성을 무시합니다.")
+        st.write("- 모델이 인식하지 못하는 범주값이 있는 경우, 해당 특성은 완전히 무시됩니다 (모든 원핫인코딩 컬럼이 0으로 설정됨).")
+        
+        return True
+    
+    def get_possible_values(self):
+        """
+        모델이 인식하는 각 범주형 변수의 가능한 값 목록을 반환합니다.
+        
+        Returns:
+            dict: 각 범주형 변수별 가능한 값 목록
+        """
+        if self.model is None or not hasattr(self.model, 'feature_names_in_'):
+            st.error("⚠️ 모델이 로드되지 않았거나 feature_names_in_ 속성이 없습니다.")
+            return {}
+        
+        # 원핫인코딩된 특성 구조 가져오기
+        encoded_features = self.get_onehot_encoded_features()
+        
+        # 각 범주형 변수별 가능한 값 목록 추출
+        category_values = {}
+        for prefix, features in encoded_features.items():
+            category_values[prefix] = [f.split('_', 1)[1] for f in features]
+        
+        return category_values
 
 ########## 함수영역역 ##########
 
@@ -204,7 +667,7 @@ class ChurnPredictor:
 # ===============================
 # ✅ 모델 로드 및 예측 함수
 # ===============================
-MODEL_PATH = Path(__file__).parent / "xgb_best_model.pkl"
+MODEL_PATH = Path(__file__).parent / "xgboost_best_model.pkl"
 
 def load_churn_model(model_path: str = None):
     """
@@ -217,7 +680,7 @@ def load_churn_model(model_path: str = None):
         Trained model
     """
     if model_path is None:
-        model_path = Path(__file__).parent / "xgb_best_model.pkl"
+        model_path = Path(__file__).parent / "xgboost_best_model.pkl"
     else:
         model_path = Path(model_path)
         
@@ -551,7 +1014,7 @@ class ChurnPredictor2:
     def __init__(self, model_path=None, external_model=None):
         """모델 로드 또는 외부 주입"""
         self.model = external_model
-        self.model_path = model_path or (Path(__file__).parent / "xgb_best_model.pkl")
+        self.model_path = model_path or (Path(__file__).parent / "xgboost_best_model.pkl")
         self.feature_importance_cache = None
 
         if self.model is None:
@@ -577,27 +1040,37 @@ class ChurnPredictor2:
             return False
 
     def predict(self, input_df: pd.DataFrame):
-        """예측 수행"""
         if self.model is None:
             self.load_model()
         if self.model is None:
+            st.warning("❗ [DEBUG] 모델이 존재하지 않아 기본값 반환됨")
             return self._default_prediction()
 
         try:
             processed_df = self._preprocess_data(input_df)
+
+            # ✅ 디버깅용 출력
+            st.write("✅ [DEBUG] 전처리 후 데이터:", processed_df)
+            st.write("✅ [DEBUG] 전처리 컬럼 수:", processed_df.shape[1])
+
             y_pred = self.model.predict(processed_df)
             y_proba = self.model.predict_proba(processed_df)[:, 1]
 
+            st.write("✅ [DEBUG] 예측 확률:", y_proba)
+
             if len(y_proba) == 0:
+                st.warning("❗ [DEBUG] 예측 확률이 비어 있음, 기본값 반환")
                 return self._default_prediction()
 
-            self.feature_importance_cache = None  # 중요도 초기화
+            self.feature_importance_cache = None
             self._compute_feature_importance(processed_df)
 
             return y_pred, y_proba
         except Exception as e:
             logger.error(f"❌ 예측 오류: {str(e)}")
+            st.error(f"❌ [DEBUG] 예측 중 오류: {e}")
             return self._default_prediction()
+
 
     def _default_prediction(self):
         """모델 실패 시 기본 반환"""
