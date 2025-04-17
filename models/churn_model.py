@@ -59,6 +59,33 @@ class ChurnPredictor:
             st.code(traceback.format_exc())
             return False
     
+    def _default_prediction(self):
+        """기본 예측값 반환"""
+        return np.array([0]), np.array([0.5])
+    
+    def _test_prediction(self, input_df):
+        """테스트용 예측 함수 - 실제 모델 없이 입력값에 따라 다른 예측 반환"""
+        # 간단한 규칙 기반 예측 (실제 모델 사용하지 않음)
+        if 'Tenure' in input_df.columns and 'SatisfactionScore' in input_df.columns:
+            tenure = input_df['Tenure'].iloc[0]
+            satisfaction = input_df['SatisfactionScore'].iloc[0]
+            
+            # 간단한 규칙: 거래기간 길고 만족도 높으면 이탈 확률 낮음
+            base_prob = 0.5
+            tenure_effect = min(0.3, tenure / 100.0)  # 최대 0.3 감소
+            satisfaction_effect = min(0.2, satisfaction / 25.0)  # 최대 0.2 감소
+            
+            churn_prob = base_prob - tenure_effect - satisfaction_effect
+            # 확률 범위 제한
+            churn_prob = max(0.1, min(0.9, churn_prob))
+            
+            st.write(f"DEBUG: 테스트 예측 - 거래기간: {tenure}, 만족도: {satisfaction}, 확률: {churn_prob}")
+            
+            return np.array([1 if churn_prob > 0.5 else 0]), np.array([churn_prob])
+        
+        # 기본값 반환
+        return np.array([0]), np.array([0.5])
+    
     def predict(self, input_df):
         """
         이탈 예측을 수행합니다.
@@ -70,11 +97,18 @@ class ChurnPredictor:
             tuple: (예측 클래스, 이탈 확률)
         """
         try:
+            st.write("DEBUG: 입력 데이터 컬럼 -", input_df.columns.tolist())
+            
+            # 테스트 모드 사용 - 실제 모델 대신 테스트 예측 사용
+            st.write("DEBUG: 테스트 모드로 예측 수행")
+            return self._test_prediction(input_df)
+            
+            # 아래 코드는 모델 디버깅 완료 후 주석 해제
+            """
             # 모델이 없으면 로드 시도
             if self.model is None:
                 st.write("DEBUG: 모델이 없어 로드 시도")
-                success = self.load_model()
-                st.write(f"DEBUG: 모델 로드 결과: {success}")
+                self.load_model()
                 
             # 모델 로드 실패 시 기본값 반환
             if self.model is None:
@@ -83,58 +117,34 @@ class ChurnPredictor:
             
             # 데이터 전처리
             processed_df = self._preprocess_data(input_df)
-            st.write(f"DEBUG: 전처리된 데이터 컬럼: {', '.join(processed_df.columns)}")
-            st.write(f"DEBUG: 전처리된 데이터:\n{processed_df.head()}")
             
             # 예측 수행
             try:
                 st.write("DEBUG: 예측 시작")
-                
-                # 더미 예측으로 테스트 (문제 지점 파악용)
-                # 주의: 실제 사용시 이 부분을 제거하고 아래 주석 해제
-                st.write("DEBUG: 더미 예측 수행 (테스트용)")
-                y_pred = np.array([1])  # 예시: 1 = 이탈, 0 = 유지
-                y_proba = np.array([0.75])  # 예시: 75% 이탈 확률
-                
-                # 실제 예측 코드 (문제 해결 후 주석 해제)
-                # y_pred = self.model.predict(processed_df)
-                # y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
-                
-                st.write(f"DEBUG: 예측 완료, 결과: {y_proba[0]}")
+                y_pred = self.model.predict(processed_df)
+                y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
                 
                 # 예측 결과 확인
                 if len(y_proba) == 0:
-                    st.write("DEBUG: 예측 결과 없음, 기본값 반환")
                     return self._default_prediction()
                 
                 # 성공적으로 예측한 경우 특성 중요도 계산
                 try:
-                    st.write("DEBUG: 특성 중요도 계산 시작")
                     self._compute_feature_importance(processed_df)
-                    st.write("DEBUG: 특성 중요도 계산 완료")
                 except Exception as e:
                     # 특성 중요도 계산 실패해도 예측 결과는 반환
-                    st.write(f"DEBUG: 특성 중요도 계산 실패: {str(e)}")
                     pass
                 
                 return y_pred, y_proba
             except Exception as e:
                 logger.error(f"예측 오류: {str(e)}")
-                st.error(f"예측 오류: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
                 return self._default_prediction()
+            """
                 
         except Exception as e:
             logger.error(f"예측 처리 중 오류: {str(e)}")
             st.error(f"예측 처리 중 오류: {str(e)}")
-            import traceback
-            st.code(traceback.format_exc())
             return self._default_prediction()
-    
-    def _default_prediction(self):
-        """기본 예측값 반환"""
-        return np.array([0]), np.array([0.5])
     
     def _preprocess_data(self, input_df):
         """
