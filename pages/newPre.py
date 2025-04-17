@@ -262,34 +262,27 @@ def main():
                 
                 st.dataframe(key_data, use_container_width=True)
                 
-                # 원형 차트로 범주형 변수 시각화
+                # 범주형 변수 정보 표시
+                st.subheader("범주형 특성 정보")
+                
+                # 범주형 변수와 한글 이름 매핑
                 categories = {
                     'Gender': '성별',
                     'PreferredLoginDevice': '선호 로그인 기기',
                     'PreferredPaymentMode': '선호 결제 방식',
                     'PreferedOrderCat': '선호 주문 카테고리',
-                    'MaritalStatus': '결혼 상태'
+                    'MaritalStatus': '결혼 상태',
+                    'Complain': '불만 제기 여부'
                 }
                 
-                # 범주형 변수 중 하나 선택
-                selected_category = st.selectbox(
-                    "범주형 변수 선택",
-                    options=list(categories.values())
-                )
+                # 범주형 변수 데이터 생성
+                categorical_data = pd.DataFrame({
+                    '특성': list(categories.values()),
+                    '값': [customer_data[k].values[0] for k in categories.keys()]
+                })
                 
-                # 선택된 변수에 해당하는 키 찾기
-                selected_key = [k for k, v in categories.items() if v == selected_category][0]
-                
-                # 원형 차트 데이터 (현재 고객의 선택 값만 표시)
-                value = customer_data[selected_key].values[0]
-                
-                # 원형 차트 생성
-                fig = px.pie(
-                    names=[value],
-                    values=[1],
-                    title=f"{selected_category}: {value}"
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                # 범주형 변수 테이블 표시
+                st.dataframe(categorical_data, use_container_width=True)
             
             # 고급 분석 섹션
             st.markdown("---")
@@ -335,4 +328,4 @@ def main():
                 st.rerun()
 
 if __name__ == "__main__":
-    main() 
+    main()
