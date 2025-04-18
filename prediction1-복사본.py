@@ -13,6 +13,8 @@ from models.churn_model import load_xgboost_model2, ChurnPredictor2
 
 def show():
     """고객 이탈 예측 페이지를 표시합니다."""
+    # st.set_page_config() 제거 - app.py에서 이미 호출됨
+    
     st.title("📊 고객 이탈 예측 시스템")
     
     # --------------------------
@@ -49,7 +51,7 @@ def show():
     
     # 13~15
     cashback     = row5[0].number_input("캐시백 금액", value=150)
-    login_device = row5[1].selectbox("선호 로그인 기기", ["Mobile Phone", "Phone"])
+    login_device = row5[1].selectbox("선호 로그인 기글", ["Mobile Phone", "Phone"])
     payment_mode = row5[2].selectbox("선호 결제 방식", [
         "Credit Card", "Debit Card", "Cash on Delivery", "COD", "E wallet", "UPI"])
     
@@ -324,9 +326,5 @@ def show():
             st.error(f"예측 오류 발생: {str(e)}")
             st.write("오류 상세 정보:", e)
             
-# app.py와의 호환성을 위한 함수
-def show_prediction():
-    show()
-            
 if __name__ == "__main__":
-    show()
+    show() 
