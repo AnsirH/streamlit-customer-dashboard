@@ -12,10 +12,10 @@ streamlit>=1.31.0
 plotly>=5.18.0
 matplotlib>=3.8.0
 
-# 데이터 처리 및 분석
+- 데이터 처리 및 분석
 openpyxl>=3.1.2
 
-# 머신러닝 및 모델링
+- 머신러닝 및 모델링
 xgboost>=2.0.0
 lightgbm>=4.1.0
 imbalanced-learn>=0.11.0
