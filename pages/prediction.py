@@ -13,12 +13,13 @@ from models.churn_model import load_xgboost_model2, ChurnPredictor2
 
 def show():
     """고객 이탈 예측 페이지를 표시합니다."""
+    st.set_page_config(page_title="고객 이탈 예측", layout="wide")
     st.title("📊 고객 이탈 예측 시스템")
     
     # --------------------------
     # 1️⃣ UI 입력 섹션 (총 18개)
     # --------------------------
-    st.subheader("1️⃣ 고객 데이터 입력")
+    st.subheader("1\ufe0f\ufe0f \uace0\uac1d \ub370\uc774\ud130 \uc785\ub825")
     
     row1 = st.columns(3)
     row2 = st.columns(3)
@@ -28,36 +29,36 @@ def show():
     row6 = st.columns(3)
     
     # 1~3
-    tenure         = row1[0].number_input("이용 기간 (개월)", min_value=0, value=12)
-    city_tier      = row1[1].selectbox("거주 도시 등급 (1~3)", [1, 2, 3], index=1)
-    warehouse_dist = row1[2].number_input("창고-집 거리 (km)", min_value=0.0, value=20.0)
+    tenure         = row1[0].number_input("\uc774\uc6a9 \uae30\uac04 (\uac1c\uc6d4)", min_value=0, value=12)
+    city_tier      = row1[1].selectbox("\uac70\uc8fc \ub3c4\uc2dc \ub4f1\uae09 (1~3)", [1, 2, 3], index=1)
+    warehouse_dist = row1[2].number_input("\ucc3d\uace0-\uc9d1 \uac70\ub9ac (km)", min_value=0.0, value=20.0)
     
     # 4~6
-    app_hour    = row2[0].number_input("앱 사용 시간 (시간)", min_value=0.0, value=2.5)
-    num_devices = row2[1].number_input("등록된 기기 수", min_value=0, value=2)
-    satisfaction= row2[2].slider("만족도 점수 (1~5)", 1, 5, 3)
+    app_hour    = row2[0].number_input("\uc571 \uc0ac\uc6a9 \uc2dc\uac04 (\uc2dc\uac04)", min_value=0.0, value=2.5)
+    num_devices = row2[1].number_input("\ub4f1\ub85d\ub41c \uae30\uae30 \uc218", min_value=0, value=2)
+    satisfaction= row2[2].slider("\ub9cc\uc871\ub3c4 \uc810\uc218 (1~5)", 1, 5, 3)
     
     # 7~9
-    num_address = row3[0].number_input("배송지 등록 수", min_value=0, value=1)
-    complain    = row3[1].selectbox("불만 제기 유무", ["예", "아니오"])
-    order_hike  = row3[2].number_input("주문금액 상승률 (%)", value=10.0)
+    num_address = row3[0].number_input("\ubc30\uc1a1\uc9c0 \ub4f1\ub85d \uc218", min_value=0, value=1)
+    complain    = row3[1].selectbox("\ubd88\ub9cc \uc81c\uae30 \uc720\ubb34", ["\uc608", "\uc544\ub2c8\uc624"])
+    order_hike  = row3[2].number_input("\uc8fc\ubb38\uae08\uc561 \uc0c1\uc2b9\ub960 (%)", value=10.0)
     
     # 10~12
-    coupon_used = row4[0].number_input("쿠폰 사용 횟수", value=2)
-    orders      = row4[1].number_input("주문 횟수", value=8)
-    last_order_days = row4[2].number_input("마지막 주문 후 경과일", value=10)
+    coupon_used = row4[0].number_input("\ucfe0\ud3f0 \uc0ac\uc6a9 \ud69f\uc218", value=2)
+    orders      = row4[1].number_input("\uc8fc\ubb38 \ud69f\uc218", value=8)
+    last_order_days = row4[2].number_input("\ub9c8\uc9c0\ub9c9 \uc8fc\ubb38 \ud6c4 \uac74\uc640\uc77c", value=10)
     
     # 13~15
-    cashback     = row5[0].number_input("캐시백 금액", value=150)
-    login_device = row5[1].selectbox("선호 로그인 기기", ["Mobile Phone", "Phone"])
-    payment_mode = row5[2].selectbox("선호 결제 방식", [
+    cashback     = row5[0].number_input("\uce90\uc2dc\ubca1 \uae08\uc561", value=150)
+    login_device = row5[1].selectbox("\uc120\ud638 \ub85c\uadf8\uc778 \uae30\uae00", ["Mobile Phone", "Phone"])
+    payment_mode = row5[2].selectbox("\uc120\ud638 \uacb0\uc81c \ubc29\uc2dd", [
         "Credit Card", "Debit Card", "Cash on Delivery", "COD", "E wallet", "UPI"])
     
     # 16~18
-    gender      = row6[0].selectbox("성별", ["Male", "Female"])
-    order_cat   = row6[1].selectbox("선호 주문 카테고리", [
+    gender      = row6[0].selectbox("\uc131\ubcc4", ["Male", "Female"])
+    order_cat   = row6[1].selectbox("\uc120\ud638 \uc8fc\ubb38 \uce74\ud14c\uace0\ub9ac", [
         "Mobile", "Mobile Phone", "Laptop & Accessory", "Grocery"])
-    marital     = row6[2].selectbox("결혼 유무", ["Single", "Married"])
+    marital     = row6[2].selectbox("\uacb0\ud63c \uc720\ubb34", ["Single", "Married"])
     
     # --------------------------
     # 2️⃣ 예측 버튼 누르면 실행
@@ -198,135 +199,57 @@ def show():
                 elif value >= 0.02: return "낮음"
                 else: return "매우 낮음"
     
-            # 중요 피처 선택 (최대 8개)
-            fi_df = fi_df_all.iloc[:8].copy()
-            fi_df["Level"] = fi_df["Importance"].apply(map_importance_level)
+            # 매핑 디버그용
+            # debug_info = [
+            #     {"원본 이름": k, "한글 이름": feature_name_map.get(k, "❌ 매핑 안됨")}
+            #     for k in importance_raw
+            # ]
+    
+            # st.subheader("🧩 입력 변수 이름 매핑 확인 (디버그)")
+            # st.table(debug_info)  # 또는 st.dataframe(debug_info)
             
-            # 레벨별 색상
-            level_colors = {
-                "매우 높음": "#ff4b4b",  # 빨강
-                "높음": "#ff9d4b",      # 주황
-                "중간": "#79c3f8",      # 파랑
-                "낮음": "#a3a0a0",      # 회색
-                "매우 낮음": "#c9c9c9"  # 연한 회색
-            }
-            
-            # 색상 컬럼 추가
-            fi_df["Color"] = fi_df["Level"].apply(lambda x: level_colors.get(x))
-            
-            # 데이터 시각화
-            fig = go.Figure()
-            
-            # 바차트 추가
-            fig.add_trace(go.Bar(
-                x=fi_df["Feature"],
-                y=fi_df["Importance"],
-                marker_color=fi_df["Color"],
-                text=fi_df["Level"],
-                textposition="outside"
+    
+    
+            # ✅ 상위 5개 시각화
+            top5 = fi_df_all.head(5)
+            fig_top = go.Figure(go.Bar(
+                x=top5["Feature"],
+                y=top5["Importance"],
+                marker_color='skyblue'
             ))
-            
-            fig.update_layout(
-                title="주요 특성 중요도",
-                xaxis_title="특성",
-                yaxis_title="중요도",
-                height=500
+            fig_top.update_layout(
+                xaxis_title="입력 변수", yaxis_title="중요도",
+                title="📊 상위 5개 중요 변수 (입력값 기준)", height=400
             )
-            
-            # 차트 표시
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # 표도 함께 표시
-            with st.expander("주요 특성 상세 정보"):
-                # 색상 변환을 위해 스타일 함수 정의
-                def color_importance(val):
-                    if val >= 0.12: return "background-color: #ff4b4b; color: white"
-                    elif val >= 0.08: return "background-color: #ff9d4b; color: white"
-                    elif val >= 0.05: return "background-color: #79c3f8; color: white"
-                    elif val >= 0.02: return "background-color: #a3a0a0; color: white"
-                    else: return "background-color: #c9c9c9; color: black"
-                
-                # 정렬된 데이터프레임 표시 (상위 15개)
-                styled_df = fi_df_all.head(15).style.format({
-                    "Importance": "{:.4f}"
-                }).applymap(
-                    lambda x: color_importance(x), subset=["Importance"]
-                )
-                
-                st.dataframe(styled_df, use_container_width=True)
-            
-            # 추가 분석: 시그모이드 변환 확률 (비선형 변환)
-            st.header("4️⃣ 확률 조정: 시그모이드 변환")
-            
-            # 변곡점 조정 슬라이더
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                x0 = st.slider(
-                    "변곡점 위치 조정",
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=0.15,
-                    step=0.05,
-                    help="값이 낮을수록 더 많은 고객이 이탈 위험이 높은 것으로 분류됩니다."
-                )
-            
-            # 고위험/저위험 임계값 설정
-            with col2:
-                col1, col2 = st.columns(2)
-                with col1:
-                    low_risk = st.slider("저위험 임계값", 0.0, 0.5, 0.3, 0.05)
-                with col2:
-                    high_risk = st.slider("고위험 임계값", 0.5, 1.0, 0.7, 0.05)
-            
-            # 시그모이드 변환 함수
-            def sigmoid_transform(p, k=15, x0=0.15):
-                import numpy as np
-                return 1 / (1 + np.exp(-k * (p - x0)))
-            
-            # 원래 확률과 조정된 확률
-            raw_prob = float(y_proba[0])
-            sigmoid_prob = sigmoid_transform(raw_prob, k=15, x0=x0)
-            
-            # 변환 전/후 비교
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("원래 확률", f"{raw_prob:.1%}")
-            with col2:
-                # 변화량 계산
-                change = (sigmoid_prob - raw_prob) * 100
-                delta_str = f"{change:+.1f}%p" if change != 0 else "변화 없음"
-                st.metric("조정된 확률 (시그모이드 변환)", f"{sigmoid_prob:.1%}", delta=delta_str)
-            
-            # 변환 정보 표시
-            st.info(f"📈 시그모이드 변환 적용됨: 변환 강도 = 15, 변곡점 = {x0:.2f}")
-            
-            # 위험도 평가
-            risk_msg = ""
-            if sigmoid_prob <= low_risk:
-                risk_msg = "😀 저위험: 이 고객은 이탈 가능성이 낮습니다."
-            elif sigmoid_prob >= high_risk:
-                risk_msg = "⚠️ 고위험: 이 고객은 이탈 가능성이 매우 높습니다!"
-            else:
-                risk_msg = "🔍 중간 위험: 이 고객은 이탈 가능성이 있으며 추가 분석이 필요합니다."
-            
-            st.markdown(f"### {risk_msg}")
-            
-            # 디버그 정보
-            with st.expander("디버그: 원시 예측값"):
-                st.write(f"클래스 예측값: {y_pred[0]}")
-                st.write(f"확률 예측값 (raw): {y_proba[0]:.6f}")
-                st.write(f"확률 예측값 (sigmoid): {sigmoid_prob:.6f}")
-                # 매우 낮은 예측값에 대한 경고
-                if raw_prob < 0.01:
-                    st.warning("원시 예측값이 매우 낮음 (< 1%): 모델 재검토 필요")
-            
+            st.plotly_chart(fig_top, use_container_width=True)
+    
+            # 해석 출력
+            st.markdown("👍 **높은 연관성성:**")
+            for _, row in top5.iterrows():
+                level = map_importance_level(row["Importance"])
+                st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
+    
+            # ✅ 하위 5개 시각화
+            bottom5 = fi_df_all.tail(5)
+            fig_bottom = go.Figure(go.Bar(
+                x=bottom5["Feature"],
+                y=bottom5["Importance"],
+                marker_color='lightgrey'
+            ))
+            fig_bottom.update_layout(
+                xaxis_title="입력 변수", yaxis_title="중요도",
+                title="📉 미관여 하위 5개 변수", height=400
+            )
+            st.plotly_chart(fig_bottom, use_container_width=True)
+    
+            # 해석 출력
+            st.markdown("👎 **낮은 연관성성**")
+            for _, row in bottom5.iterrows():
+                level = map_importance_level(row["Importance"])
+                st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
         except Exception as e:
-            st.error(f"예측 오류 발생: {str(e)}")
-            st.write("오류 상세 정보:", e)
-            
-# app.py와의 호환성을 위한 함수
-def show_prediction():
-    show()
-            
+            st.error(f"❌ 예측 실패: {str(e)}")
+
+# 직접 실행될 때만 동작하도록 메인 함수 추가
 if __name__ == "__main__":
     show()
