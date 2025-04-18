@@ -266,6 +266,7 @@ streamlit-customer-dashboard/
                 Bagging
                 XGBoost
                 LightGBM
+                
     - 최종 모델: XGBoostClassifier (최종 선택)
     - 교차검증: 5-Fold
     - 비교 모델: LogisticRegression, KNN, SVC, NaiveBayes
