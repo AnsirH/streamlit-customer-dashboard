@@ -19,54 +19,21 @@ class CustomerAnalyzer:
         self.feature_importance_cache = None
         
         try:
-            # 모델 파일 경로 설정
             current_dir = os.path.dirname(os.path.abspath(__file__))
             models_dir = Path(current_dir).parent / "models"
-            
-            # 모델 파일 경로
             model_path = models_dir / "xgboost_best_model.pkl"
-            st.write(f"🔍 디버그: 모델 파일 경로 - {model_path}")
-            st.write(f"🔍 디버그: 모델 파일 존재 여부 - {model_path.exists()}")
             
-            # 모델 로드
             if model_path.exists():
-                st.write("🔍 디버그: 모델 파일 로드 시도 중...")
                 try:
-                    # pickle로 시도
                     with open(model_path, 'rb') as f:
                         self.model = pickle.load(f)
-                    st.write("🔍 디버그: pickle로 모델 로드 성공")
-                except Exception as e:
-                    st.write(f"🔍 디버그: pickle 로드 실패 - {str(e)}")
+                except Exception:
                     try:
-                        # joblib로 시도
                         self.model = joblib.load(model_path)
-                        st.write("🔍 디버그: joblib로 모델 로드 성공")
-                    except Exception as e:
-                        st.write(f"🔍 디버그: joblib 로드 실패 - {str(e)}")
-                        st.error(f"🔍 디버그: 모델 파일이 손상되었거나 올바른 형식이 아닙니다.")
-                        st.error(f"🔍 디버그: 모델 파일을 다시 생성하거나 올바른 파일을 사용해주세요.")
+                    except Exception:
                         self.model = None
-                
-                if self.model is not None:
-                    # 모델 정보 출력
-                    st.write(f"🔍 디버그: 모델 타입 - {type(self.model)}")
-                    if hasattr(self.model, 'feature_importances_'):
-                        st.write(f"🔍 디버그: 모델 특성 수 - {len(self.model.feature_importances_)}")
-            else:
-                st.error(f"🔍 디버그: 모델 파일을 찾을 수 없습니다. 경로: {model_path}")
-                st.error(f"🔍 디버그: models 디렉토리 내용:")
-                if models_dir.exists():
-                    for file in models_dir.iterdir():
-                        st.write(f"- {file.name}")
-                else:
-                    st.error("models 디렉토리가 존재하지 않습니다.")
-        except Exception as e:
-            st.error(f"🔍 디버그: 모델 로드 중 오류 발생")
-            st.error(f"🔍 디버그: 오류 타입 - {type(e).__name__}")
-            st.error(f"🔍 디버그: 오류 메시지 - {str(e)}")
-            st.error(f"🔍 디버그: 현재 작업 디렉토리 - {os.getcwd()}")
-            st.error(f"🔍 디버그: 파일 경로 - {os.path.abspath(__file__)}")
+        except Exception:
+            self.model = None
     
     def load_data(self):
         """고객 데이터를 로드하고 전처리합니다."""
@@ -75,17 +42,7 @@ class CustomerAnalyzer:
             models_dir = Path(current_dir).parent / "models"
             file_path = models_dir / "E Commerce Dataset2.xlsx"
             
-            st.write(f"🔍 디버그: 데이터 파일 경로 - {file_path}")
-            st.write(f"🔍 디버그: 데이터 파일 존재 여부 - {file_path.exists()}")
-            
             if not file_path.exists():
-                st.error(f"🔍 디버그: 데이터 파일을 찾을 수 없습니다. 경로: {file_path}")
-                st.error(f"🔍 디버그: models 디렉토리 내용:")
-                if models_dir.exists():
-                    for file in models_dir.iterdir():
-                        st.write(f"- {file.name}")
-                else:
-                    st.error("models 디렉토리가 존재하지 않습니다.")
                 return False
             
             # 데이터 로드
@@ -104,21 +61,14 @@ class CustomerAnalyzer:
             
             # 결측치 처리 후 데이터 저장
             self.df = df
-            
-            st.write(f"🔍 디버그: 데이터 로드 성공 - {len(self.df)}행")
             return True
             
-        except Exception as e:
-            st.error(f"🔍 디버그: 데이터 로드 중 오류 발생")
-            st.error(f"🔍 디버그: 오류 타입 - {type(e).__name__}")
-            st.error(f"🔍 디버그: 오류 메시지 - {str(e)}")
+        except Exception:
             return False
     
-    def predict(self, input_data, debug=True):
+    def predict(self, input_data, debug=False):
         """입력 데이터에 대한 이탈 확률을 예측합니다."""
         if self.model is None:
-            if debug:
-                st.error("모델이 로드되지 않았습니다.")
             return None
         
         try:
@@ -151,31 +101,20 @@ class CustomerAnalyzer:
             
             # 예측 수행
             churn_prob = self.model.predict_proba(processed_data)[:, 1]
+            return float(churn_prob[0])
             
-            # 디버깅 정보 출력
-            if debug:
-                st.write(f"🔍 디버그: 예측 데이터 shape - {processed_data.shape}")
-                st.write(f"🔍 디버그: 예측된 이탈 확률 - {churn_prob[0]:.2%}")
-            
-            return float(churn_prob[0])  # 단일 고객에 대한 예측이므로 첫 번째 값 반환
-            
-        except Exception as e:
-            if debug:
-                st.error(f"예측 중 오류 발생: {str(e)}")
-                st.error(f"🔍 디버그: 처리된 데이터 컬럼 - {processed_data.columns.tolist()}")
+        except Exception:
             return None
     
     def analyze_customer(self, customer_id):
         """특정 고객의 데이터를 분석합니다."""
         if self.df is None:
-            st.warning("데이터를 먼저 로드해주세요.")
             return {'customer_data': None, 'churn_prob': None}
         
         try:
             # 고객 데이터 조회
             customer_data = self.df[self.df['CustomerID'] == customer_id]
             if customer_data.empty:
-                st.error(f"고객 ID {customer_id}를 찾을 수 없습니다.")
                 return {'customer_data': None, 'churn_prob': None}
             
             # 데이터 전처리
@@ -188,8 +127,7 @@ class CustomerAnalyzer:
                 'customer_data': customer_data,
                 'churn_prob': churn_prob
             }
-        except Exception as e:
-            st.error(f"고객 분석 중 오류 발생: {str(e)}")
+        except Exception:
             return {'customer_data': None, 'churn_prob': None}
     
     def _preprocess_data(self, input_df):
@@ -314,9 +252,8 @@ class CustomerAnalyzer:
             
             return result_df
             
-        except Exception as e:
-            st.error(f"데이터 전처리 중 오류: {str(e)}")
-            raise e
+        except Exception:
+            return None
     
     def get_customer_list(self):
         """모든 고객 ID 목록을 반환합니다."""
@@ -339,11 +276,9 @@ class CustomerAnalyzer:
         """특성 중요도를 계산합니다."""
         try:
             if self.model is None:
-                st.error("모델이 로드되지 않았습니다.")
                 return None
             
             if not hasattr(self.model, 'feature_importances_'):
-                st.error("모델이 특성 중요도를 지원하지 않습니다.")
                 return None
             
             # 특성 중요도 계산
@@ -370,8 +305,7 @@ class CustomerAnalyzer:
             self.feature_importance_cache = pd.Series(importance, index=feature_names)
             return self.feature_importance_cache
             
-        except Exception as e:
-            st.error(f"특성 중요도 계산 중 오류: {str(e)}")
+        except Exception:
             return None
 
     def get_top_issues(self, customer_id):
@@ -430,8 +364,7 @@ class CustomerAnalyzer:
             # 이슈 이름만 반환
             return [issue[0] for issue in sorted_issues]
             
-        except Exception as e:
-            st.error(f"이탈 요인 분석 중 오류 발생: {str(e)}")
+        except Exception:
             return []
 
     def get_customer_insights(self, customer_id):
@@ -486,7 +419,6 @@ class CustomerAnalyzer:
         """DaySinceLastOrder 컬럼의 통계 정보를 분석합니다."""
         try:
             if self.df is None:
-                st.warning("데이터를 먼저 로드해주세요.")
                 return
             
             # DaySinceLastOrder 컬럼의 통계 정보
@@ -513,5 +445,5 @@ class CustomerAnalyzer:
                          annotation_text="30일 기준선", annotation_position="top right")
             st.plotly_chart(fig)
             
-        except Exception as e:
-            st.error(f"데이터 분석 중 오류 발생: {str(e)}") 
+        except Exception:
+            pass 
