@@ -142,7 +142,6 @@ streamlit-customer-dashboard/
 
 ## 📊 데이터셋 소개
 
-```
 본 프로젝트는 Kaggle에서 제공된 **E-Commerce 고객 데이터셋**을 기반으로, 고객 이탈 여부를 예측하기 위해 활용하였습니다.
 
 - 총 샘플 수: 5,630명
@@ -174,7 +173,6 @@ streamlit-customer-dashboard/
 
 > ⚠ 일부 변수(`Tenure`, `WarehouseToHome`, `HourSpendOnApp` 등)는 결측값을 포함하고 있으며, 전처리 과정에서 평균 대체 또는 제거됨.
 
-```
 
 
 ## ⚙️ 데이터 전처리
