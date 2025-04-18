@@ -24,7 +24,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## 주요 기능
+## 📋 주요 기능
 ```
 - 고객 이탈 예측
 - 데이터 시각화
@@ -42,7 +42,7 @@ streamlit run app.py
 
 ```
 
-## 🧹 데이터 전처리
+## ⚙️ 데이터 전처리
 ```
 - 결측값 제거 및 평균 대체
 - 수치형 변수 IQR 기반 이상치 정리
