@@ -21,7 +21,7 @@ streamlit-customer-dashboard/
 ├── models/                    # 머신러닝 모델
 │   ├── __pycache__/
 │   ├── churn_model.py         # 이탈 예측 모델 클래스
-│   └── xgb_best_model.pkl     # 훈련된 XGBoost 모델
+│   └── xgboost_best_model.pkl     # 훈련된 XGBoost 모델
 │
 ├── pages/                     # 대시보드 페이지
 │   ├── __pycache__/
