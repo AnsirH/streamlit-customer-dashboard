@@ -161,13 +161,6 @@ if st.button("🧠 이탈 예측하기"):
         # 중요도 가져오기
         importance_raw = predictor.get_feature_importance()
 
-
-        # 매핑이 잘 되었는지 확인
-        for k in importance_raw:
-            mapped = feature_name_map.get(k, None)
-            print(f"원본: {k} → 매핑된 이름: {mapped if mapped else '❌ 매핑 안됨'}")
-
-
         # 한글 이름 적용
         importance_named = {
             feature_name_map.get(k, k): v for k, v in importance_raw.items()
@@ -184,6 +177,16 @@ if st.button("🧠 이탈 예측하기"):
             elif value >= 0.05: return "중간"
             elif value >= 0.02: return "낮음"
             else: return "매우 낮음"
+
+        debug_info = [
+            {"원본 이름": k, "한글 이름": feature_name_map.get(k, "❌ 매핑 안됨")}
+            for k in importance_raw
+        ]
+
+        st.subheader("🧩 입력 변수 이름 매핑 확인 (디버그)")
+        st.table(debug_info)  # 또는 st.dataframe(debug_info)
+
+
 
         # ✅ 상위 5개 시각화
         top5 = fi_df_all.head(5)
