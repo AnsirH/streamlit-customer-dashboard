@@ -250,14 +250,6 @@ def show():
                     for _, row in bottom5.iterrows():
                         level = map_importance_level(row["Importance"])
                         st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
-                        
-                    # 디버그 정보
-                    with st.expander("디버그: 원시 예측값"):
-                        st.write(f"클래스 예측값: {y_pred[0]}")
-                        st.write(f"확률 예측값 (raw): {y_proba[0]:.6f}")
-                        # 매우 낮은 예측값에 대한 경고
-                        if float(y_proba[0]) < 0.01:
-                            st.warning("원시 예측값이 매우 낮음 (< 1%): 모델 재검토 필요")
                             
                 except Exception as e:
                     st.error(f"❌ 예측 모델 실행 오류: {str(e)}")
