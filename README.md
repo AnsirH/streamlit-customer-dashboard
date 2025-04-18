@@ -24,7 +24,16 @@
 - 
 
 
-## 🛠️ 기술 스택
+## 🛠 사용 기술 (Tech Stack)
+
+- 🐍 Python 3.12
+- 📊 pandas, numpy, openpyxl
+- 📈 matplotlib, plotly, streamlit
+- 🤖 scikit-learn, XGBoost, LightGBM
+- ⚖️ imbalanced-learn (SMOTE)
+- 🧠 SHAP (모델 해석용)
+- 🌐 Streamlit (대시보드 구축 및 배포)
+
 
 
 
