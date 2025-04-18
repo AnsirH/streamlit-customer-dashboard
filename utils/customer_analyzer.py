@@ -124,113 +124,90 @@ class CustomerAnalyzer:
         except Exception:
             return {'customer_data': None, 'churn_prob': None}
     
-    def get_customer_list(self):
-        """모든 고객 ID 목록을 반환합니다."""
-        if self.df is None:
-            if not self.load_data():
-                return []
-        return self.df['CustomerID'].tolist()
-    
-    def get_feature_importance(self):
-        """특성 중요도를 반환합니다."""
-        if self.feature_importance_cache is None:
-            self._compute_feature_importance()
-        return self.feature_importance_cache
-
-    def _compute_feature_importance(self):
-        """특성 중요도를 계산합니다."""
+    def _interpret_feature(self, feature_str):
+        """
+        영향 요인 문자열을 해석하여 직관적인 설명을 반환합니다.
+        
+        Args:
+            feature_str (str): "특성명 (방향)" 형식의 문자열
+            
+        Returns:
+            str: 해석된 설명
+        """
         try:
-            if self.model is None:
-                return None
+            # 특성명과 방향 분리
+            if ' (' not in feature_str:
+                return feature_str
+                
+            feature_name = feature_str.split(' (')[0].strip()
+            direction = feature_str.split(' (')[1].replace(')', '').strip()
             
-            if not hasattr(self.model, 'feature_importances_'):
-                return None
+            # 해석 규칙 정의
+            interpretations = {
+                '불만 제기': '높은 불만 제기',
+                '만족도 점수': '낮은 만족도' if '부정' in direction else '높은 만족도',
+                '마지막 주문 후 경과일': '장기간 주문 없음',
+                '주문 횟수': '낮은 주문 빈도' if '부정' in direction else '높은 주문 빈도',
+                '캐시백 금액': '낮은 캐시백 사용' if '부정' in direction else '높은 캐시백 사용',
+                '앱 사용 시간': '낮은 앱 사용 시간' if '부정' in direction else '높은 앱 사용 시간',
+                '거래 기간': '짧은 거래 기간' if '부정' in direction else '긴 거래 기간',
+                '작년 대비 주문 증가율': '낮은 주문 증가율' if '부정' in direction else '높은 주문 증가율',
+                '쿠폰 사용 횟수': '낮은 쿠폰 사용' if '부정' in direction else '높은 쿠폰 사용',
+                '배송 거리': '먼 배송 거리' if '부정' in direction else '가까운 배송 거리',
+                '선호 로그인 기기': '비선호 로그인 기기 사용' if '부정' in direction else '선호 로그인 기기 사용',
+                '선호 결제 수단': '비선호 결제 수단 사용' if '부정' in direction else '선호 결제 수단 사용',
+                '성별': '성별 관련 이슈',
+                '선호 주문 카테고리': '비선호 카테고리 주문' if '부정' in direction else '선호 카테고리 주문',
+                '결혼 여부': '결혼 상태 관련 이슈',
+                '도시 등급': '도시 등급 관련 이슈',
+                '주소 개수': '적은 주소 등록' if '부정' in direction else '많은 주소 등록',
+                '등록된 기기 수': '적은 기기 등록' if '부정' in direction else '많은 기기 등록'
+            }
             
-            # 특성 중요도 계산
-            importance = self.model.feature_importances_
+            # 해석된 설명 반환
+            return interpretations.get(feature_name, feature_name)
             
-            # 특성 이름과 중요도 매핑
-            feature_names = [
-                # 수치형 특성 (13개)
-                'Tenure', 'CityTier', 'WarehouseToHome', 'HourSpendOnApp',
-                'NumberOfDeviceRegistered', 'SatisfactionScore', 'NumberOfAddress',
-                'Complain', 'OrderAmountHikeFromlastYear', 'CouponUsed',
-                'OrderCount', 'DaySinceLastOrder', 'CashbackAmount',
-                # 원핫인코딩된 특성 (15개)
-                'PreferredLoginDevice_Mobile Phone', 'PreferredLoginDevice_Phone',
-                'PreferredPaymentMode_COD', 'PreferredPaymentMode_Cash on Delivery',
-                'PreferredPaymentMode_Credit Card', 'PreferredPaymentMode_Debit Card',
-                'PreferredPaymentMode_E wallet', 'PreferredPaymentMode_UPI',
-                'Gender_Male',
-                'PreferedOrderCat_Grocery', 'PreferedOrderCat_Laptop & Accessory',
-                'PreferedOrderCat_Mobile', 'PreferedOrderCat_Mobile Phone',
-                'MaritalStatus_Married', 'MaritalStatus_Single'
-            ]
-            
-            self.feature_importance_cache = pd.Series(importance, index=feature_names)
-            return self.feature_importance_cache
-            
-        except Exception:
-            return None
+        except Exception as e:
+            print(f"특성 해석 중 오류 발생: {str(e)}")
+            return feature_str
 
     def get_top_issues(self, customer_id):
-        """고객의 상위 3개 이탈 요인을 반환합니다."""
+        """
+        고객의 상위 3개 이탈 요인을 반환합니다.
+        
+        Args:
+            customer_id (int): 고객 ID
+            
+        Returns:
+            list: 상위 3개 이탈 요인 리스트
+        """
         try:
-            # 고객 데이터 가져오기
-            customer_data = self.df[self.df['CustomerID'] == customer_id].iloc[0]
+            # analyze_customers() 결과 가져오기
+            from models.customer_analyzer import analyze_customers
+            analysis_results = analyze_customers()
             
-            # 특성별 점수 계산
-            scores = {}
+            # 해당 고객의 데이터 찾기
+            customer_data = analysis_results[analysis_results['CustomerID'] == customer_id]
             
-            # 마지막 주문 경과일
-            if customer_data['DaySinceLastOrder'] > 7:
-                scores['장기간 주문 없음'] = customer_data['DaySinceLastOrder'] / 30
+            if customer_data.empty:
+                return ["데이터를 찾을 수 없습니다."]
             
-            # 만족도
-            if customer_data['SatisfactionScore'] < 3:
-                scores['낮은 만족도'] = (3 - customer_data['SatisfactionScore']) / 3
+            # 상위 3개 영향 요인 추출
+            top_issues = []
+            for i in range(1, 4):
+                feature_col = f'Top Feature {i}'
+                
+                if feature_col in customer_data.columns:
+                    feature = customer_data.iloc[0][feature_col]
+                    
+                    if pd.notna(feature):  # None이나 NaN이 아닌 경우에만 추가
+                        top_issues.append(feature)
             
-            # 불만 제기
-            if customer_data['Complain'] == 1:
-                scores['불만 제기 이력'] = 1.0
+            return top_issues if top_issues else ["이탈 요인이 없습니다."]
             
-            # 주문 횟수
-            avg_order_count = self.df['OrderCount'].mean()
-            if customer_data['OrderCount'] < avg_order_count:
-                scores['낮은 주문 빈도'] = (avg_order_count - customer_data['OrderCount']) / avg_order_count
-            
-            # 캐시백 사용
-            avg_cashback = self.df['CashbackAmount'].mean()
-            if customer_data['CashbackAmount'] < avg_cashback:
-                scores['낮은 캐시백 사용'] = (avg_cashback - customer_data['CashbackAmount']) / avg_cashback
-            
-            # 앱 사용 시간
-            avg_app_hours = self.df['HourSpendOnApp'].mean()
-            if customer_data['HourSpendOnApp'] < avg_app_hours:
-                scores['낮은 앱 사용 시간'] = (avg_app_hours - customer_data['HourSpendOnApp']) / avg_app_hours
-            
-            # 거래 기간
-            avg_tenure = self.df['Tenure'].mean()
-            if customer_data['Tenure'] < avg_tenure:
-                scores['짧은 거래 기간'] = (avg_tenure - customer_data['Tenure']) / avg_tenure
-            
-            # 주문 금액 증가율
-            if customer_data['OrderAmountHikeFromlastYear'] < 10:
-                scores['낮은 주문 금액 증가율'] = (10 - customer_data['OrderAmountHikeFromlastYear']) / 10
-            
-            # 쿠폰 사용
-            avg_coupon = self.df['CouponUsed'].mean()
-            if customer_data['CouponUsed'] < avg_coupon:
-                scores['낮은 쿠폰 사용'] = (avg_coupon - customer_data['CouponUsed']) / avg_coupon
-            
-            # 점수가 높은 순으로 정렬하여 상위 3개 선택
-            sorted_issues = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
-            
-            # 이슈 이름만 반환
-            return [issue[0] for issue in sorted_issues]
-            
-        except Exception:
-            return []
+        except Exception as e:
+            print(f"이탈 요인 분석 중 오류 발생: {str(e)}")
+            return ["분석 중 오류가 발생했습니다."]
 
     def get_customer_insights(self, customer_id):
         """고객에 대한 인사이트를 반환합니다."""

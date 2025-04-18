@@ -46,13 +46,43 @@ def show_customer_churn_analysis():
         col1, col2, col3 = st.columns(3)
         with col1:
             high_risk = len(result_df[result_df['Churn Risk'] >= 0.7])
-            st.metric("고위험 고객 수", f"{high_risk}명", "이탈 위험 70% 이상")
+            st.markdown("""
+                <div style='font-size: 1.5em; font-weight: bold;'>
+                    고위험 고객 수
+                </div>
+                <div style='color: #FF4B4B; font-size: 0.8em;'>
+                    이탈 위험 70% 이상
+                </div>
+                <div style='font-size: 1.2em; font-weight: bold; margin-top: 5px; margin-bottom: 10px;'>
+                    {high_risk}명
+                </div>
+            """.format(high_risk=high_risk), unsafe_allow_html=True)
         with col2:
             med_risk = len(result_df[(result_df['Churn Risk'] >= 0.4) & (result_df['Churn Risk'] < 0.7)])
-            st.metric("중위험 고객 수", f"{med_risk}명", "이탈 위험 40~70%")
+            st.markdown("""
+                <div style='font-size: 1.5em; font-weight: bold;'>
+                    중위험 고객 수
+                </div>
+                <div style='color: #FFA500; font-size: 0.8em;'>
+                    이탈 위험 40~70%
+                </div>
+                <div style='font-size: 1.2em; font-weight: bold; margin-top: 5px; margin-bottom: 10px;'>
+                    {med_risk}명
+                </div>
+            """.format(med_risk=med_risk), unsafe_allow_html=True)
         with col3:
             low_risk = len(result_df[result_df['Churn Risk'] < 0.4])
-            st.metric("저위험 고객 수", f"{low_risk}명", "이탈 위험 40% 미만")
+            st.markdown("""
+                <div style='font-size: 1.5em; font-weight: bold;'>
+                    저위험 고객 수
+                </div>
+                <div style='color: #32CD32; font-size: 0.8em;'>
+                    이탈 위험 40% 미만
+                </div>
+                <div style='font-size: 1.2em; font-weight: bold; margin-top: 5px; margin-bottom: 10px;'>
+                    {low_risk}명
+                </div>
+            """.format(low_risk=low_risk), unsafe_allow_html=True)
         
         # 필터 컨테이너 생성
         col1, col2 = st.columns([1, 1])

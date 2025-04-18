@@ -205,7 +205,29 @@ def analyze_customers():
             'PreferredPaymentMode': '선호 결제 수단',
             'Gender': '성별',
             'PreferedOrderCat': '선호 주문 카테고리',
-            'MaritalStatus': '결혼 여부'
+            'MaritalStatus': '결혼 여부',
+            'CityTier': '도시 등급',
+            'NumberOfAddress': '주소 개수',
+            'NumberOfDeviceRegistered': '등록된 기기 수',
+            'PreferredLoginDevice_Mobile Phone': '선호 로그인 기기 (모바일)',
+            'PreferredLoginDevice_Phone': '선호 로그인 기기 (전화)',
+            'PreferredPaymentMode_COD': '선호 결제 수단 (현금 결제)',
+            'PreferredPaymentMode_Cash on Delivery': '선호 결제 수단 (현금 결제)',
+            'PreferredPaymentMode_Credit Card': '선호 결제 수단 (신용카드)',
+            'PreferredPaymentMode_Debit Card': '선호 결제 수단 (체크카드)',
+            'PreferredPaymentMode_E wallet': '선호 결제 수단 (전자지갑)',
+            'PreferredPaymentMode_UPI': '선호 결제 수단 (UPI)',
+            'Gender_Male': '성별 (남성)',
+            'Gender_Female': '성별 (여성)',
+            'PreferedOrderCat_Electronics': '선호 주문 카테고리 (전자제품)',
+            'PreferedOrderCat_Fashion': '선호 주문 카테고리 (패션)',
+            'PreferedOrderCat_Grocery': '선호 주문 카테고리 (식료품)',
+            'PreferedOrderCat_Laptop': '선호 주문 카테고리 (노트북)',
+            'PreferedOrderCat_Mobile': '선호 주문 카테고리 (모바일)',
+            'PreferedOrderCat_Others': '선호 주문 카테고리 (기타)',
+            'MaritalStatus_Married': '결혼 여부 (기혼)',
+            'MaritalStatus_Single': '결혼 여부 (미혼)',
+            'MaritalStatus_Divorced': '결혼 여부 (이혼)'
         }
         
         # 결과 저장을 위한 리스트
