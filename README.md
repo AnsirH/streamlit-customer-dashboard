@@ -196,7 +196,6 @@ streamlit-customer-dashboard/
     - 비교 모델: LogisticRegression, KNN, SVC, NaiveBayes
     - 교차검증: 5-Fold
     - 하이퍼파라미터 튜닝: GridSearchCV
-    
     ```
 
 
