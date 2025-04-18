@@ -84,11 +84,11 @@ streamlit run app.py
 
 ## ⚙️ 데이터 전처리
 ```
-- 결측값 제거 및 평균 대체
-- 수치형 변수 IQR 기반 이상치 정리
-- One-hot 인코딩, StandardScaler 적용
-- SMOTE 오버샘플링으로 클래스 불균형 처리
-
+1. 수치형 변수 결측치 평균 대체
+2. 수치형 변수 이상치 IQR 필터링
+3. 범주형 변수 One-hot인코딩
+4. SMOTE OverSampling으로 클래스 불균형 처리
+5. StandardScaler 적용
 ```
 
 ## 🧠 모델링
