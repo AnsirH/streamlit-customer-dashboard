@@ -9,11 +9,13 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-# 모듈 import 
-from models.churn_model import load_xgboost_model2, ChurnPredictor2
+# 모듈 import는 show 함수 내부로 이동
 
 def show():
     """고객 이탈 예측 페이지를 표시합니다."""
+    # 필요한 모듈을 함수 내에서 동적으로 import (lazy import)
+    from models.churn_model import load_xgboost_model2, ChurnPredictor2
+    
     st.title("📊 고객 이탈 예측 시스템")
     
     # --------------------------
