@@ -15,49 +15,186 @@ logger = setup_logger(__name__)
 
 ########## 함수업데이트작업 ##########
 
-def load_xgboost_model2():
-    """XGBoost 모델을 로드합니다."""
-    try:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.join(current_dir, "xgboost_best_model.pkl")
-        
-        if os.path.exists(model_path):
-            with open(model_path, 'rb') as f:
-                model = pickle.load(f)
-            return model
-        else:
-            st.error(f"모델 파일을 찾을 수 없습니다: {model_path}")
-            return None
-    except Exception as e:
-        st.error(f"모델 로드 중 오류 발생: {str(e)}")
-        return None
-
-class ChurnPredictor2:
-    """이탈 예측을 위한 클래스"""
+class ChurnPredictor:
+    """고객 이탈 예측을 위한 모델 클래스"""
     
-    def __init__(self, model_path=None, external_model=None):
-        self.model = external_model if external_model else load_xgboost_model2()
+    def __init__(self, model_path=None):
+        """모델을 로드하고 초기화합니다."""
+        self.model = None
+        if model_path is None:
+            self.model_path = Path(__file__).parent / "xgb_best_model.pkl"
+        else:
+            self.model_path = model_path
+        self.feature_importance_cache = None  # 특성 중요도 캐시 추가
+        try:
+            self.load_model()
+        except Exception as e:
+            logger.error(f"모델 로드 오류: {str(e)}")
+            st.error(f"모델 로드 중 오류가 발생했습니다.")
+    
+    def load_model(self):
+        """모델 파일을 로드합니다."""
+        try:
+            if not self.model_path.exists():
+                logger.error(f"모델 파일을 찾을 수 없습니다: {self.model_path}")
+                return False
+            
+            self.model = joblib.load(self.model_path)
+            logger.info(f"모델 로드 성공: {self.model_path}")
+            # 디버그 출력 추가
+            st.write(f"🔍 디버그: 모델 로드 성공 - {self.model_path}")
+            return True
+        except Exception as e:
+            logger.error(f"모델 로드 실패: {str(e)}")
+            # 디버그 출력 추가
+            st.error(f"🔍 디버그: 모델 로드 실패 - {str(e)}")
+            return False
     
     def predict(self, input_df):
-        """입력 데이터에 대한 이탈 확률을 예측합니다."""
-        if self.model is None:
-            return self._default_prediction()
+        """
+        이탈 예측을 수행합니다.
         
+        Args:
+            input_df (pandas.DataFrame): 예측할 고객 데이터
+            
+        Returns:
+            tuple: (예측 클래스, 이탈 확률)
+        """
         try:
-            return self.model.predict_proba(input_df)[:, 1]
+            # 모델이 없으면 로드 시도
+            if self.model is None:
+                self.load_model()
+                
+            # 모델 로드 실패 시 기본값 반환
+            if self.model is None:
+                return self._default_prediction()
+            
+            # 데이터 전처리
+            processed_df = self._preprocess_data(input_df)
+            
+            # 예측 수행
+            try:
+                y_pred = self.model.predict(processed_df)
+                y_proba = self.model.predict_proba(processed_df)[:, 1]  # 이탈 확률
+                
+                # 예측 결과 확인
+                if len(y_proba) == 0:
+                    return self._default_prediction()
+                
+                # 성공적으로 예측한 경우 특성 중요도 계산
+                try:
+                    self._compute_feature_importance(processed_df)
+                except Exception as e:
+                    # 특성 중요도 계산 실패해도 예측 결과는 반환
+                    pass
+                
+                return y_pred, y_proba
+            except Exception as e:
+                logger.error(f"예측 오류: {str(e)}")
+                return self._default_prediction()
+                
         except Exception as e:
-            st.error(f"예측 중 오류 발생: {str(e)}")
+            logger.error(f"예측 처리 중 오류: {str(e)}")
             return self._default_prediction()
     
     def _default_prediction(self):
-        """기본 예측값을 반환합니다."""
-        return np.array([0.5])
+        """기본 예측값 반환"""
+        return np.array([0]), np.array([0.5])
+    
+    def _preprocess_data(self, input_df):
+        """
+        입력 데이터를 전처리합니다.
+        
+        Args:
+            input_df (pandas.DataFrame): 원본 입력 데이터
+            
+        Returns:
+            pandas.DataFrame: 전처리된 데이터
+        """
+        # 입력 데이터 복사
+        df = input_df.copy()
+        
+        # CustomerID 제거 (예측에 사용되지 않음)
+        columns_to_remove = ['CustomerID', 'customer_id', 'cust_id', 'id']
+        for col in columns_to_remove:
+            if col in df.columns:
+                df = df.drop(col, axis=1)
+        
+        # Complain 불리언 변환 (예/아니오 -> 0/1)
+        if 'Complain' in df.columns and isinstance(df['Complain'].iloc[0], str):
+            df['Complain'] = df['Complain'].apply(lambda x: 1 if x == '예' else 0)
+        
+        return df
+    
+    def _compute_feature_importance(self, input_data):
+        """Calculate feature importance for a prediction."""
+        try:
+            # 캐시된 특성 중요도가 있으면 사용
+            if self.feature_importance_cache is not None:
+                return self.feature_importance_cache
+                
+            # 이하 기존 로직
+            if self.model is None:
+                self.load_model()
+                
+            if self.model is None:  # 여전히 None이면 기본값 반환
+                return self._default_feature_importance()
+                
+            # SHAP 사용 시도
+            try:
+                import shap
+                explainer = shap.TreeExplainer(self.model)
+                shap_values = explainer.shap_values(input_data)
+                
+                # 분류 모델인 경우 클래스 1(이탈)에 대한 SHAP 값 선택
+                if isinstance(shap_values, list):
+                    shap_values = shap_values[1]
+                    
+                # 절대값 취해 중요도 계산
+                importance = np.abs(shap_values).mean(axis=0)
+                
+                # 캐시에 저장
+                self.feature_importance_cache = importance
+                return importance
+                
+            except Exception as e:
+                print(f"SHAP을 사용한 특성 중요도 계산 실패: {str(e)}")
+                
+                # 모델에 feature_importances_ 속성이 있으면 사용
+                if hasattr(self.model, 'feature_importances_'):
+                    importance = self.model.feature_importances_
+                    self.feature_importance_cache = importance
+                    return importance
+                    
+                return self._default_feature_importance()
+                
+        except Exception as e:
+            print(f"특성 중요도 계산 중 오류 발생: {str(e)}")
+            return self._default_feature_importance()
+    
+    def _default_feature_importance(self):
+        """특성 중요도 계산이 실패할 경우 기본값을 반환합니다."""
+        # 기본 특성 중요도 값 설정
+        default_importance = np.array([0.25, 0.22, 0.18, 0.15, 0.12, 0.08])
+        self.feature_importance_cache = default_importance
+        return default_importance
     
     def get_feature_importance(self):
-        """특성 중요도를 반환합니다."""
-        if self.model is None or not hasattr(self.model, 'feature_importances_'):
-            return None
-        return self.model.feature_importances_
+        """캐시된 특성 중요도를 반환합니다."""
+        if self.feature_importance_cache is None:
+            # 특성 중요도가 계산되지 않았다면 기본값 반환
+            return self._default_feature_importance()
+            
+        # 특성 중요도가 배열 형태인 경우 사전 형태로 변환
+        if isinstance(self.feature_importance_cache, np.ndarray):
+            # 특성 이름이 없는 경우 기본 이름 사용
+            features = {}
+            for i, val in enumerate(self.feature_importance_cache):
+                features[f'feature_{i+1}'] = float(val)
+            return features
+            
+        return self.feature_importance_cache
+
 
 ########## 함수영역역 ##########
 
@@ -67,21 +204,20 @@ class ChurnPredictor2:
 # ===============================
 # ✅ 모델 로드 및 예측 함수
 # ===============================
-current_dir = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = Path(current_dir) / "xgboost_best_model.pkl"
+MODEL_PATH = Path(__file__).parent / "xgb_best_model.pkl"
 
 def load_churn_model(model_path: str = None):
     """
     Load the trained churn prediction model.
     
     Args:
-        model_path: Path to the model file. Default is models/xgboost_best_model.pkl
+        model_path: Path to the model file. Default is models/xgb_best_model.pkl
         
     Returns:
         Trained model
     """
     if model_path is None:
-        model_path = Path(current_dir) / "xgboost_best_model.pkl"
+        model_path = Path(__file__).parent / "xgb_best_model.pkl"
     else:
         model_path = Path(model_path)
         
@@ -381,6 +517,96 @@ def show_top_influencers(model, X_input):
 
 
 ##########################
+import joblib
+from pathlib import Path
+
+def load_xgboost_model2():
+    """
+    /models/xgboost_best_model.pkl 파일을 로드합니다.
+    
+    Returns:
+        model: 학습된 XGBoost 모델
+    Raises:
+        FileNotFoundError: 모델 파일이 존재하지 않을 경우
+        Exception: 모델 로드 중 오류 발생 시
+    """
+    model_path = Path(__file__).resolve().parent / "xgboost_best_model.pkl"
+
+    if not model_path.exists():
+        raise FileNotFoundError(f"[❌ 모델 파일 없음] {model_path}")
+
+    try:
+        model = joblib.load(model_path)
+        return model
+    except Exception as e:
+        raise RuntimeError(f"[❌ 모델 로드 실패] {e}")
+
+##########################
+# 예측 모델 불러오기 
+#########################
+
+import joblib
+from pathlib import Path
+
+def load_xgboost_model2():
+    """xgboost_best_model.pkl 파일을 로드하는 함수"""
+    model_path = Path(__file__).resolve().parent / "xgboost_best_model.pkl"
+    if not model_path.exists():
+        raise FileNotFoundError(f"❌ 모델 파일이 존재하지 않습니다: {model_path}")
+    return joblib.load(model_path)
+
+##########################
+# 예측 모델 클래스
+#########################
+import numpy as np
+import shap
+
+class ChurnPredictor2:
+    """고객 이탈 예측 모델 클래스"""
+
+    def __init__(self, model_path=None, external_model=None):
+        self.model = external_model
+        self.model_path = model_path
+        self.feature_importance_cache = None
+
+    def predict(self, input_df):
+        if self.model is None:
+            return self._default_prediction()
+
+        try:
+            y_pred = self.model.predict(input_df)
+            y_proba = self.model.predict_proba(input_df)[:, 1]
+            return y_pred, y_proba
+        except Exception as e:
+            print(f"[예측 오류] {e}")
+            return self._default_prediction()
+
+    def _default_prediction(self):
+        return np.array([0]), np.array([0.5])
+
+    def get_feature_importance(self):
+        if self.feature_importance_cache is not None:
+            return self.feature_importance_cache
+
+        try:
+            explainer = shap.TreeExplainer(self.model)
+            X_sample = np.zeros((1, len(self.model.get_booster().feature_names)))
+            shap_values = explainer.shap_values(X_sample)
+            importance = np.abs(shap_values).mean(axis=0)
+            feature_names = self.model.get_booster().feature_names
+            self.feature_importance_cache = dict(zip(feature_names, importance))
+            return self.feature_importance_cache
+        except Exception as e:
+            print(f"[SHAP 오류] {e}")
+            return {}
+
+
+
+##########################
+
+
+
+########## 함수업데이트작업 ##########
 
 
 
