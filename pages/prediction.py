@@ -31,8 +31,7 @@ def show():
     debug_log("prediction.py의 show() 함수 호출됨")
     
     try:
-        # st.set_page_config(page_title="고객 이탈 예측", layout="wide")
-        # 주의: app.py에서 이미 st.set_page_config가 호출되었으므로 여기서는 제거함
+        # st.set_page_config() 호출 제거
         
         st.title("📊 고객 이탈 예측 시스템")
         debug_log("페이지 타이틀 설정 완료")
@@ -272,9 +271,9 @@ def show():
 
 if __name__ == "__main__":
     debug_log("prediction.py가 직접 실행됨")
-    # 이 파일이 직접 실행될 때만 set_page_config 호출
+    # 이 파일이 직접 실행될 때도 st.set_page_config() 호출 제거
     try:
-        st.set_page_config(page_title="고객 이탈 예측", layout="wide")
+        # 직접 실행 시에도 st.set_page_config() 호출 제거
         debug_log("직접 실행 시 페이지 설정 완료")
         show()
     except Exception as e:
