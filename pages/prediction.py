@@ -1,19 +1,20 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from pathlib import Path
 import sys
+from pathlib import Path
 
-# 경로 설정
-ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
-
-from models.churn_model import load_xgboost_model2, ChurnPredictor2
-
+# 전역 변수를 최소화하고 필요한 import만 유지
 def show():
     """고객 이탈 예측 페이지를 표시합니다."""
-    st.set_page_config(page_title="고객 이탈 예측", layout="wide")
+    # 경로 설정을 함수 내부로 이동
+    ROOT = Path(__file__).resolve().parent.parent
+    if str(ROOT) not in sys.path:
+        sys.path.append(str(ROOT))
+    
+    # 필요한 모듈을 show 함수 내에서 임포트
+    from models.churn_model import load_xgboost_model2, ChurnPredictor2
+    
     st.title("📊 고객 이탈 예측 시스템")
     
     # --------------------------
@@ -181,6 +182,16 @@ def show():
             }
             # 중요도 가져오기
             importance_raw = predictor.get_feature_importance()
+            
+            # 중요도가 딕셔너리가 아닌 경우, None 또는 튜플 형태일 수 있으므로 처리
+            if importance_raw is None:
+                st.error("특성 중요도를 계산할 수 없습니다.")
+                return
+                
+            # 중요도가 튜플인 경우 (get_feature_importance가 수정된 경우)
+            if isinstance(importance_raw, tuple):
+                features, importances = importance_raw
+                importance_raw = dict(zip(features, importances))
     
             # 한글 이름 적용
             importance_named = {
@@ -249,7 +260,11 @@ def show():
                 st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
         except Exception as e:
             st.error(f"❌ 예측 실패: {str(e)}")
+            import traceback
+            st.write(traceback.format_exc())
 
 # 직접 실행될 때만 동작하도록 메인 함수 추가
 if __name__ == "__main__":
+    # 직접 실행 시에만 페이지 설정 (app.py에서 불러올 때는 충돌 방지)
+    st.set_page_config(page_title="고객 이탈 예측", layout="wide")
     show()
