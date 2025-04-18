@@ -30,10 +30,10 @@ streamlit run app.py
 - 데이터 시각화
 - 통계 분석
 
-```
+
 
 ## 🎯 프로젝트 개요
-
+```
 - **목적**: 고객의 이탈 가능성을 사전에 예측하여 유지 전략 수립에 활용
 - **데이터 출처**: Kaggle 공개 데이터셋
 - **샘플 수**: 5,630명
@@ -43,7 +43,7 @@ streamlit run app.py
 ```
 
 ## 🧹 데이터 전처리
-
+```
 - 결측값 제거 및 평균 대체
 - 수치형 변수 IQR 기반 이상치 정리
 - One-hot 인코딩, StandardScaler 적용
@@ -52,7 +52,7 @@ streamlit run app.py
 ```
 
 ## 🧠 모델링
-
+```
 - 사용 모델: XGBoostClassifier (최종 선택)
 - 비교 모델: LogisticRegression, KNN, SVC, NaiveBayes
 - 교차검증: 5-Fold
