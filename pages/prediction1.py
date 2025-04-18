@@ -161,6 +161,13 @@ if st.button("🧠 이탈 예측하기"):
         # 중요도 가져오기
         importance_raw = predictor.get_feature_importance()
 
+
+        # 매핑이 잘 되었는지 확인
+        for k in importance_raw:
+            mapped = feature_name_map.get(k, None)
+            print(f"원본: {k} → 매핑된 이름: {mapped if mapped else '❌ 매핑 안됨'}")
+
+
         # 한글 이름 적용
         importance_named = {
             feature_name_map.get(k, k): v for k, v in importance_raw.items()
@@ -206,7 +213,7 @@ if st.button("🧠 이탈 예측하기"):
         ))
         fig_bottom.update_layout(
             xaxis_title="입력 변수", yaxis_title="중요도",
-            title="📉 하위 5개 중요 변수", height=400
+            title="📉 미관여 하위 5개 변수", height=400
         )
         st.plotly_chart(fig_bottom, use_container_width=True)
 
