@@ -1,4 +1,12 @@
 import streamlit as st
+
+# 페이지 설정 (모든 다른 Streamlit 명령어보다 먼저 실행되어야 함)
+st.set_page_config(
+    page_title="고객 이탈 예측",
+    page_icon="📊",
+    layout="wide"
+)
+
 import pandas as pd
 import plotly.graph_objects as go
 import sys
