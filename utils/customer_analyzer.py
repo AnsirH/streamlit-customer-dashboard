@@ -35,8 +35,22 @@ class CustomerAnalyzer:
         except Exception:
             self.model = None
     
+    @staticmethod
+    def generate_customer_ids(df):
+        """데이터프레임에 CustomerID가 없는 경우 생성합니다.
+        
+        Args:
+            df (pandas.DataFrame): CustomerID를 생성할 데이터프레임
+            
+        Returns:
+            pandas.DataFrame: CustomerID가 추가된 데이터프레임
+        """
+        if 'CustomerID' not in df.columns:
+            df['CustomerID'] = [f'CUST_{i:06d}' for i in range(1, len(df) + 1)]
+        return df
+
     def load_data(self):
-        """고객 데이터를 로드하고 전처리합니다."""
+        """고객 데이터를 로드합니다."""
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
             models_dir = Path(current_dir).parent / "models"
@@ -48,33 +62,21 @@ class CustomerAnalyzer:
             # 데이터 로드
             df = pd.read_excel(file_path)
             
-            # 결측치 처리
-            # 수치형 컬럼의 결측치는 중앙값으로 대체
-            numeric_columns = df.select_dtypes(include=['int64', 'float64']).columns
-            for col in numeric_columns:
-                df[col] = df[col].fillna(df[col].median())
+            # CustomerID 생성
+            df = self.generate_customer_ids(df)
             
-            # 범주형 컬럼의 결측치는 최빈값으로 대체
-            categorical_columns = df.select_dtypes(include=['object']).columns
-            for col in categorical_columns:
-                df[col] = df[col].fillna(df[col].mode()[0])
-            
-            # 결측치 처리 후 데이터 저장
             self.df = df
             return True
             
         except Exception:
             return False
     
-    def predict(self, input_data, debug=False):
+    def predict(self, input_data):
         """입력 데이터에 대한 이탈 확률을 예측합니다."""
         if self.model is None:
             return None
         
         try:
-            # 데이터 전처리
-            processed_data = self._preprocess_data(input_data)
-            
             # 필요한 특성만 선택 (28개 특성)
             required_features = [
                 'Tenure', 'CityTier', 'WarehouseToHome', 'HourSpendOnApp',
@@ -91,16 +93,11 @@ class CustomerAnalyzer:
                 'MaritalStatus_Married', 'MaritalStatus_Single'
             ]
             
-            # 누락된 특성이 있다면 0으로 채움
-            for feature in required_features:
-                if feature not in processed_data.columns:
-                    processed_data[feature] = 0
-            
             # 특성 순서 맞추기
-            processed_data = processed_data[required_features]
+            input_data = input_data[required_features]
             
             # 예측 수행
-            churn_prob = self.model.predict_proba(processed_data)[:, 1]
+            churn_prob = self.model.predict_proba(input_data)[:, 1]
             return float(churn_prob[0])
             
         except Exception:
@@ -117,11 +114,8 @@ class CustomerAnalyzer:
             if customer_data.empty:
                 return {'customer_data': None, 'churn_prob': None}
             
-            # 데이터 전처리
-            processed_data = self._preprocess_data(customer_data)
-            
             # 이탈 예측
-            churn_prob = self.predict(processed_data)
+            churn_prob = self.predict(customer_data)
             
             return {
                 'customer_data': customer_data,
@@ -130,131 +124,6 @@ class CustomerAnalyzer:
         except Exception:
             return {'customer_data': None, 'churn_prob': None}
     
-    def _preprocess_data(self, input_df):
-        """입력 데이터를 전처리합니다."""
-        try:
-            # 입력 데이터 복사
-            df = input_df.copy()
-            
-            # 결측치를 먼저 처리
-            df = df.fillna(0)
-            
-            # CustomerID 제거 (예측에 사용되지 않음)
-            columns_to_remove = ['CustomerID', 'customer_id', 'customerid', 'cust_id', 'id', 'Churn']
-            for col in columns_to_remove:
-                if col in df.columns:
-                    df = df.drop(col, axis=1)
-            
-            # 수치형 컬럼들을 먼저 정수로 변환
-            numeric_columns = [
-                'Tenure', 'CityTier', 'WarehouseToHome', 'HourSpendOnApp',
-                'NumberOfDeviceRegistered', 'SatisfactionScore', 'NumberOfAddress',
-                'OrderAmountHikeFromlastYear', 'CouponUsed',
-                'OrderCount', 'DaySinceLastOrder', 'CashbackAmount'
-            ]
-            
-            for col in numeric_columns:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-            
-            # Complain 불리언 변환
-            if 'Complain' in df.columns:
-                if df['Complain'].dtype == 'object':
-                    df['Complain'] = df['Complain'].apply(lambda x: 1 if str(x).lower() in ['예', 'yes', '1', 'true'] else 0)
-                df['Complain'] = pd.to_numeric(df['Complain'], errors='coerce').fillna(0).astype(int)
-            
-            # PreferredLoginDevice 원핫인코딩
-            if 'PreferredLoginDevice' in df.columns:
-                # 값 표준화
-                df['PreferredLoginDevice'] = df['PreferredLoginDevice'].str.strip()
-                df['PreferredLoginDevice'] = df['PreferredLoginDevice'].replace({
-                    'Mobile': 'Mobile Phone',
-                    'Phone': 'Mobile Phone'
-                })
-                
-                # 원핫인코딩
-                df['PreferredLoginDevice_Mobile Phone'] = (df['PreferredLoginDevice'] == 'Mobile Phone').astype(int)
-                df['PreferredLoginDevice_Phone'] = (df['PreferredLoginDevice'] == 'Phone').astype(int)
-                df = df.drop('PreferredLoginDevice', axis=1)
-            else:
-                df['PreferredLoginDevice_Mobile Phone'] = 0
-                df['PreferredLoginDevice_Phone'] = 0
-            
-            # PreferredPaymentMode 원핫인코딩
-            payment_modes = ['COD', 'Cash on Delivery', 'Credit Card', 'Debit Card', 'E wallet', 'UPI']
-            if 'PreferredPaymentMode' in df.columns:
-                for mode in payment_modes:
-                    df[f'PreferredPaymentMode_{mode}'] = (df['PreferredPaymentMode'] == mode).astype(int)
-                df = df.drop('PreferredPaymentMode', axis=1)
-            else:
-                for mode in payment_modes:
-                    df[f'PreferredPaymentMode_{mode}'] = 0
-            
-            # Gender 원핫인코딩
-            if 'Gender' in df.columns:
-                df['Gender_Male'] = (df['Gender'].isin(['M', 'Male'])).astype(int)
-                df = df.drop('Gender', axis=1)
-            else:
-                df['Gender_Male'] = 0
-            
-            # PreferedOrderCat 원핫인코딩
-            order_cats = ['Grocery', 'Laptop & Accessory', 'Mobile', 'Mobile Phone']
-            if 'PreferedOrderCat' in df.columns:
-                for cat in order_cats:
-                    df[f'PreferedOrderCat_{cat}'] = (df['PreferedOrderCat'] == cat).astype(int)
-                df = df.drop('PreferedOrderCat', axis=1)
-            else:
-                for cat in order_cats:
-                    df[f'PreferedOrderCat_{cat}'] = 0
-            
-            # MaritalStatus 원핫인코딩
-            marital_statuses = ['Married', 'Single']
-            if 'MaritalStatus' in df.columns:
-                for status in marital_statuses:
-                    df[f'MaritalStatus_{status}'] = (df['MaritalStatus'] == status).astype(int)
-                df = df.drop('MaritalStatus', axis=1)
-            else:
-                for status in marital_statuses:
-                    df[f'MaritalStatus_{status}'] = 0
-            
-            # 필수 컬럼 확인 (모델이 사용하는 28개 특성)
-            required_columns = [
-                # 수치형 특성 (13개)
-                'Tenure', 'CityTier', 'WarehouseToHome', 'HourSpendOnApp',
-                'NumberOfDeviceRegistered', 'SatisfactionScore', 'NumberOfAddress',
-                'Complain', 'OrderAmountHikeFromlastYear', 'CouponUsed',
-                'OrderCount', 'DaySinceLastOrder', 'CashbackAmount',
-                # 원핫인코딩된 특성 (15개)
-                'PreferredLoginDevice_Mobile Phone', 'PreferredLoginDevice_Phone',
-                'PreferredPaymentMode_COD', 'PreferredPaymentMode_Cash on Delivery',
-                'PreferredPaymentMode_Credit Card', 'PreferredPaymentMode_Debit Card',
-                'PreferredPaymentMode_E wallet', 'PreferredPaymentMode_UPI',
-                'Gender_Male',
-                'PreferedOrderCat_Grocery', 'PreferedOrderCat_Laptop & Accessory',
-                'PreferedOrderCat_Mobile', 'PreferedOrderCat_Mobile Phone',
-                'MaritalStatus_Married', 'MaritalStatus_Single'
-            ]
-            
-            # 누락된 컬럼 처리
-            for col in required_columns:
-                if col not in df.columns:
-                    df[col] = 0
-            
-            # 최종 결측치 처리
-            df = df.fillna(0)
-            
-            # 필요한 컬럼만 선택하여 반환
-            result_df = df[required_columns]
-            
-            # 모든 컬럼이 정수형인지 확인하고 변환
-            for col in result_df.columns:
-                result_df[col] = pd.to_numeric(result_df[col], errors='coerce').fillna(0).astype(int)
-            
-            return result_df
-            
-        except Exception:
-            return None
-    
     def get_customer_list(self):
         """모든 고객 ID 목록을 반환합니다."""
         if self.df is None:
@@ -262,10 +131,6 @@ class CustomerAnalyzer:
                 return []
         return self.df['CustomerID'].tolist()
     
-    def get_customer_ids(self):
-        """get_customer_list의 별칭 메서드"""
-        return self.get_customer_list()
-
     def get_feature_importance(self):
         """특성 중요도를 반환합니다."""
         if self.feature_importance_cache is None:
