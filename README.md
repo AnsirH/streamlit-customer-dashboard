@@ -35,10 +35,12 @@ venv\Scripts\activate     # Windows
   2. 패키지 설치:
 
     2-1. 일괄 설치
+    
 ```bash
 pip install -r requirements.txt
 ```
     2-2. 개별설치
+    
 ```bash
 # 기본 환경
 pip install numpy>=1.26.0 pandas>=2.1.0 streamlit>=1.31.0 plotly>=5.18.0 matplotlib>=3.8.0 
