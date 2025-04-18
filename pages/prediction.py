@@ -4,17 +4,16 @@ import plotly.graph_objects as go
 import sys
 from pathlib import Path
 
-# 전역 변수를 최소화하고 필요한 import만 유지
+# 경로 설정
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
+# 모듈 import도 먼저 하기
+from models.churn_model import load_xgboost_model2, ChurnPredictor2
+
 def show():
     """고객 이탈 예측 페이지를 표시합니다."""
-    # 경로 설정을 함수 내부로 이동
-    ROOT = Path(__file__).resolve().parent.parent
-    if str(ROOT) not in sys.path:
-        sys.path.append(str(ROOT))
-    
-    # 필요한 모듈을 show 함수 내에서 임포트
-    from models.churn_model import load_xgboost_model2, ChurnPredictor2
-    
     st.title("📊 고객 이탈 예측 시스템")
     
     # --------------------------
@@ -265,6 +264,5 @@ def show():
 
 # 직접 실행될 때만 동작하도록 메인 함수 추가
 if __name__ == "__main__":
-    # 직접 실행 시에만 페이지 설정 (app.py에서 불러올 때는 충돌 방지)
-    st.set_page_config(page_title="고객 이탈 예측", layout="wide")
+    # 직접 실행 시에도 페이지 설정 호출 제거
     show()
