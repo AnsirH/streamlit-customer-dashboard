@@ -1,12 +1,4 @@
 import streamlit as st
-
-# 페이지 설정 (모든 다른 Streamlit 명령어보다 먼저 실행되어야 함)
-st.set_page_config(
-    page_title="고객 이탈 예측",
-    page_icon="📊",
-    layout="wide"
-)
-
 import pandas as pd
 import plotly.graph_objects as go
 import sys
@@ -258,6 +250,12 @@ def show():
             import traceback
             st.write(traceback.format_exc())
 
-# 직접 실행될 때만 사용
+# 직접 실행될 때 사용
 if __name__ == "__main__":
-    pass  # 직접 실행에 필요한 코드가 있으면 여기에 추가
+    try:
+        # 메인 함수 호출 (페이지 설정 없이)
+        show()
+    except Exception as e:
+        st.error(f"오류 발생: {str(e)}")
+        import traceback
+        st.write(traceback.format_exc())
