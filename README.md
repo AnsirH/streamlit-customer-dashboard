@@ -24,15 +24,58 @@
 - 
 
 
-## 🛠 사용 기술 (Tech Stack)
+## 🛠 Tech Stack
 
-- 🐍 Python 3.12
-- 📊 pandas, numpy, openpyxl
-- 📈 matplotlib, plotly, streamlit
-- 🤖 scikit-learn, XGBoost, LightGBM
-- ⚖️ imbalanced-learn (SMOTE)
-- 🧠 SHAP (모델 해석용)
-- 🌐 Streamlit (대시보드 구축 및 배포)
+<p align="left">
+
+  <!-- 언어 -->
+  <a href="https://www.python.org/" target="_blank">
+    <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
+  </a>
+
+  <!-- 데이터 처리 -->
+  <a href="https://numpy.org/" target="_blank">
+    <img src="https://img.shields.io/badge/Numpy-013243?style=for-the-badge&logo=numpy&logoColor=white"/>
+  </a>
+  <a href="https://pandas.pydata.org/" target="_blank">
+    <img src="https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white"/>
+  </a>
+  <a href="https://openpyxl.readthedocs.io/" target="_blank">
+    <img src="https://img.shields.io/badge/OpenPyXL-Data%20Handling-yellow?style=for-the-badge"/>
+  </a>
+
+  <!-- 시각화 -->
+  <a href="https://matplotlib.org/" target="_blank">
+    <img src="https://img.shields.io/badge/Matplotlib-007ACC?style=for-the-badge&logo=matplotlib&logoColor=white"/>
+  </a>
+  <a href="https://plotly.com/" target="_blank">
+    <img src="https://img.shields.io/badge/Plotly-3F4F75?style=for-the-badge&logo=plotly&logoColor=white"/>
+  </a>
+  <a href="https://streamlit.io/" target="_blank">
+    <img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white"/>
+  </a>
+
+  <!-- 머신러닝 -->
+  <a href="https://xgboost.readthedocs.io/" target="_blank">
+    <img src="https://img.shields.io/badge/XGBoost-EC1C24?style=for-the-badge"/>
+  </a>
+  <a href="https://lightgbm.readthedocs.io/" target="_blank">
+    <img src="https://img.shields.io/badge/LightGBM-9ACD32?style=for-the-badge"/>
+  </a>
+  <a href="https://scikit-learn.org/" target="_blank">
+    <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white"/>
+  </a>
+  <a href="https://imbalanced-learn.org/" target="_blank">
+    <img src="https://img.shields.io/badge/Imbalanced--Learn-008B8B?style=for-the-badge"/>
+  </a>
+  <a href="https://joblib.readthedocs.io/" target="_blank">
+    <img src="https://img.shields.io/badge/Joblib-C0C0C0?style=for-the-badge"/>
+  </a>
+  <a href="https://shap.readthedocs.io/" target="_blank">
+    <img src="https://img.shields.io/badge/SHAP-Model%20Explainability-blueviolet?style=for-the-badge"/>
+  </a>
+
+</p>
 
 
 
