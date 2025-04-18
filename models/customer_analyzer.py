@@ -5,6 +5,7 @@ import joblib
 from sklearn.preprocessing import LabelEncoder
 import pickle
 import shap
+from utils.customer_analyzer import CustomerAnalyzer
 
 class ChurnPredictor:
     """고객 이탈 예측을 위한 모델 클래스"""
@@ -167,10 +168,8 @@ def analyze_customers():
         # 데이터셋 로드
         df = pd.read_csv(data_path)
         
-        # CustomerID 컬럼 확인 및 생성
-        if 'CustomerID' not in df.columns:
-            print("CustomerID 컬럼이 없어 순차적인 ID를 생성합니다.")
-            df['CustomerID'] = [f'CUST_{i:06d}' for i in range(1, len(df) + 1)]
+        # CustomerID 생성
+        df = CustomerAnalyzer.generate_customer_ids(df)
         
         # ChurnPredictor 인스턴스 생성
         predictor = ChurnPredictor()
@@ -291,7 +290,7 @@ def analyze_customers():
 
 def load_customer_data():
     """
-    전체 고객 데이터를 로드합니다.
+    전처리된 고객 데이터를 로드합니다.
     Returns:
         DataFrame: 모든 컬럼을 포함한 전체 고객 데이터
     """
@@ -305,11 +304,9 @@ def load_customer_data():
         
         # 데이터셋 로드
         df = pd.read_csv(data_path)
-
-        # CustomerID 컬럼 확인 및 생성
-        if 'CustomerID' not in df.columns:
-            print("CustomerID 컬럼이 없어 순차적인 ID를 생성합니다.")
-            df['CustomerID'] = [f'CUST_{i:06d}' for i in range(1, len(df) + 1)]
+        
+        # CustomerID 생성
+        df = CustomerAnalyzer.generate_customer_ids(df)
         
         return df
         

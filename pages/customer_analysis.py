@@ -28,46 +28,38 @@ def show():
     st.markdown("---")
     st.subheader(f"고객 {customer_id}번 상세 분석")
     
-    try:
-        # 전체 고객 데이터 로드
-        full_data = load_customer_data()
-        # 이탈 예측 결과 로드
-        prediction_data = analyze_customers()
-        
-        # 선택된 고객의 전체 데이터 찾기
-        customer_full_data = full_data[full_data['CustomerID'] == customer_id]
-        if customer_full_data.empty:
-            st.error(f"고객 ID {customer_id}에 대한 데이터를 찾을 수 없습니다.")
-            return
-        customer_full_data = customer_full_data.iloc[0]
-        
-        # 선택된 고객의 예측 데이터 찾기
-        customer_prediction = prediction_data[prediction_data['CustomerID'] == customer_id]
-        if customer_prediction.empty:
-            st.error(f"고객 ID {customer_id}에 대한 예측 데이터를 찾을 수 없습니다.")
-            return
-        customer_prediction = customer_prediction.iloc[0]
-        
-    except Exception as e:
-        st.error(f"데이터 로드 중 오류가 발생했습니다: {str(e)}")
+    # 전체 고객 데이터 로드
+    full_data = load_customer_data()
+    # 이탈 예측 결과 로드
+    prediction_data = analyze_customers()
+    
+    # 선택된 고객의 전체 데이터 찾기
+    customer_full_data = full_data[full_data['CustomerID'] == customer_id]
+    if customer_full_data.empty:
+        st.error(f"고객 ID {customer_id}에 대한 데이터를 찾을 수 없습니다.")
+        return
+    customer_full_data = customer_full_data.iloc[0]
+    
+    # 선택된 고객의 예측 데이터 찾기
+    customer_prediction = prediction_data[prediction_data['CustomerID'] == customer_id]
+    if customer_prediction.empty:
+        st.error(f"고객 ID {customer_id}에 대한 예측 데이터를 찾을 수 없습니다.")
+        return
+    customer_prediction = customer_prediction.iloc[0]
 
 ####### 개인 분석 코드 #######
             
     # CustomerAnalyzer 인스턴스 생성
     analyzer = CustomerAnalyzer()
     
-    # 데이터 로드
-    if not analyzer.load_data():
-        st.error("데이터를 로드할 수 없습니다.")
+    # 고객 데이터 로드
+    df = load_customer_data()
+    if df is None or df.empty:
+        st.error("고객 데이터를 로드할 수 없습니다.")
         return
     
-    # 고객 ID 선택
-    customer_ids = analyzer.get_customer_ids()
-    if not customer_ids:
-        st.error("고객 데이터가 없습니다.")
-        return
-    
-    customer_id = st.selectbox("고객 ID 선택", customer_ids)
+    # CustomerAnalyzer에 데이터 설정
+    analyzer.df = df
     
     # 선택된 고객 분석
     analysis = analyzer.analyze_customer(customer_id)
@@ -221,17 +213,23 @@ def show():
 
             st.markdown("##### 고객 기본 정보")
             customer_data = analysis['customer_data'].iloc[0]
-            info_data = pd.Series(
-                data=[
-                    f"{int(customer_data['Tenure'])}개월",
-                    customer_data['PreferredLoginDevice'],
-                    f"Tier {customer_data['CityTier']}",
-                    '남성' if customer_data['Gender'] in ['M', 'Male'] else '여성'
-                ],
-                index=['거래기간', '선호 로그인 기기', '도시 등급', '성별'],
-                name='data'
-            )
-            st.write(info_data)
+            info_data = {
+                '거래기간': f"{customer_data['Tenure']}개월",
+                '선호 로그인 기기': '모바일' if customer_data['PreferredLoginDevice_Mobile Phone'] == 1 else '전화',
+                '선호 결제 수단': next(
+                    (mode.split('_')[-1] for mode in [
+                        'PreferredPaymentMode_COD',
+                        'PreferredPaymentMode_Cash on Delivery',
+                        'PreferredPaymentMode_Credit Card',
+                        'PreferredPaymentMode_Debit Card',
+                        'PreferredPaymentMode_E wallet',
+                        'PreferredPaymentMode_UPI'
+                    ] if customer_data[mode] == 1),
+                    '알 수 없음'
+                ),
+                '성별': '남성' if customer_data['Gender_Male'] == 1 else '여성'
+            }
+            st.write(pd.Series(info_data))
             st.markdown("#### 이탈 확률")
             st.markdown('70% 이상의 이탈 확률을 가진 고객은 이탈 위험이 높습니다.')
             
@@ -255,10 +253,20 @@ def show():
             
             st.markdown("##### 고객 기본 정보")
             info_data = {
-                '거래기간': f"{customer_full_data['Tenure']}개월",
-                '선호 로그인 기기': customer_full_data['PreferredLoginDevice'],
-                '선호 결제 수단': customer_full_data['PreferredPaymentMode'],
-                '성별': customer_full_data['Gender']
+                '거래기간': f"{customer_data['Tenure']}개월",
+                '선호 로그인 기기': '모바일' if customer_data['PreferredLoginDevice_Mobile Phone'] == 1 else '전화',
+                '선호 결제 수단': next(
+                    (mode.split('_')[-1] for mode in [
+                        'PreferredPaymentMode_COD',
+                        'PreferredPaymentMode_Cash on Delivery',
+                        'PreferredPaymentMode_Credit Card',
+                        'PreferredPaymentMode_Debit Card',
+                        'PreferredPaymentMode_E wallet',
+                        'PreferredPaymentMode_UPI'
+                    ] if customer_data[mode] == 1),
+                    '알 수 없음'
+                ),
+                '성별': '남성' if customer_data['Gender_Male'] == 1 else '여성'
             }
             st.write(pd.Series(info_data))
 
