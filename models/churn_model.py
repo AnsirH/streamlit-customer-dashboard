@@ -15,35 +15,49 @@ logger = setup_logger(__name__)
 
 ########## 함수업데이트작업 ##########
 
-class ChurnPredictor:
+def load_xgboost_model2():
+    """XGBoost 모델을 로드합니다."""
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(current_dir, "xgboost_best_model.pkl")
+        
+        if os.path.exists(model_path):
+            with open(model_path, 'rb') as f:
+                model = pickle.load(f)
+            return model
+        else:
+            st.error(f"모델 파일을 찾을 수 없습니다: {model_path}")
+            return None
+    except Exception as e:
+        st.error(f"모델 로드 중 오류 발생: {str(e)}")
+        return None
+
+class ChurnPredictor2:
     """이탈 예측을 위한 클래스"""
     
-    def __init__(self):
-        self.model = None
-        try:
-            # 모델 파일 경로 설정
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            model_path = Path(current_dir) / "xgboost_best_model.pkl"
-            
-            # 모델 로드
-            if model_path.exists():
-                self.model = joblib.load(model_path)
-        except Exception as e:
-            print(f"모델 로드 중 오류 발생: {str(e)}")
+    def __init__(self, model_path=None, external_model=None):
+        self.model = external_model if external_model else load_xgboost_model2()
     
-    def predict(self, input_data):
+    def predict(self, input_df):
         """입력 데이터에 대한 이탈 확률을 예측합니다."""
         if self.model is None:
-            return None
+            return self._default_prediction()
         
         try:
-            # 예측 수행
-            churn_prob = self.model.predict_proba(input_data)[:, 1]
-            return churn_prob[0]  # 단일 고객에 대한 예측이므로 첫 번째 값 반환
+            return self.model.predict_proba(input_df)[:, 1]
         except Exception as e:
-            print(f"예측 중 오류 발생: {str(e)}")
+            st.error(f"예측 중 오류 발생: {str(e)}")
+            return self._default_prediction()
+    
+    def _default_prediction(self):
+        """기본 예측값을 반환합니다."""
+        return np.array([0.5])
+    
+    def get_feature_importance(self):
+        """특성 중요도를 반환합니다."""
+        if self.model is None or not hasattr(self.model, 'feature_importances_'):
             return None
-
+        return self.model.feature_importances_
 
 ########## 함수영역역 ##########
 
@@ -367,12 +381,6 @@ def show_top_influencers(model, X_input):
 
 
 ##########################
-
-
-
-
-
-########## 함수업데이트작업 ##########
 
 
 
