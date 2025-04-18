@@ -125,9 +125,7 @@ streamlit-customer-dashboard/
 │   ├── all_data.py            # 전체 데이터 페이지 (78줄)
 │   ├── customer_analysis.py   # 고객 분석 페이지 (109줄)
 │   ├── customer_dashboard.py  # 고객 대시보드 페이지 (256줄)
-│   ├── prediction.py          # 현재 사용중인 예측 페이지 (705줄)
-│   ├── prediction1.py         # 예측 페이지 버전 1 (100줄)
-│   └── prediction2.py         # 예측 페이지 버전 2 (1098줄)
+│   └── prediction.py          # 현재 사용중인 예측 페이지 (705줄)
 │
 └── utils/                     # 유틸리티 함수
     ├── __pycache__/
