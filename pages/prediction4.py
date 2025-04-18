@@ -261,9 +261,9 @@ if uploaded_file:
         if col in ["고객ID", "이탈확률", "위험군"]:
             continue
         if df_recovered[col].dtype == object:
-            updated_values[col] = st.selectbox(col, sorted(df_recovered[col].unique()), index=sorted(df_recovered[col].unique()).index(selected_row[col]))
+            # updated_values[col] = st.selectbox(col, sorted(df_recovered[col].unique()), index=sorted(df_recovered[col].unique()).index(selected_row[col]))
         else:
-            updated_values[col] = st.number_input(col, value=float(selected_row[col]))
+            # updated_values[col] = st.number_input(col, value=float(selected_row[col]))
 
     if st.button("변동 예측하기"):
         df_updated = pd.DataFrame([updated_values])
