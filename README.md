@@ -42,7 +42,7 @@ venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
     
-    "2-2. 개별설치"
+    2-2. 개별설치
     
 ```bash
 # 기본 환경
