@@ -26,11 +26,11 @@ scikit-learn>=1.3.0   # 의존성 충돌 방지용 권장 추가
 ## 💾 설치 방법
 
 1. 가상환경 생성 및 활성화:
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
-```
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # Linux/Mac
+    venv\Scripts\activate     # Windows
+    ```
 
 2. 패키지 설치:    
     2-1. 일괄 설치
@@ -55,9 +55,9 @@ venv\Scripts\activate     # Windows
     ```
 
 3. 앱 실행:
-```bash
-streamlit run app.py
-```
+    ```bash
+    streamlit run app.py
+    ```
 
 ## 📋 주요 기능
 ```
