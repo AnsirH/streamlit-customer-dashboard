@@ -97,7 +97,7 @@ class ModelPredictor:
             
             # 예측 확률 계산
             probabilities = model.predict_proba(X)[:, 1]
-            df['churn_probability'] = probabilities
+            df['churn_prob'] = probabilities
             
             # 상위 3개 영향 요인과 중요도 계산
             feature_importances = model.feature_importances_
@@ -110,6 +110,12 @@ class ModelPredictor:
                 df.loc[i, 'importance_2'] = feature_importances[top_features[1]]
                 df.loc[i, 'top_feature_3'] = X.columns[top_features[2]]
                 df.loc[i, 'importance_3'] = feature_importances[top_features[2]]
+            
+            # 상위 3개 고객 표시
+            top_customers = df.nlargest(3, 'churn_prob')
+            for _, customer_data in top_customers.iterrows():
+                st.markdown(f"### 고객 ID: {customer_data['CustomerID']}")
+                Visualizer.create_churn_gauge(customer_data['churn_prob']),
             
             return df
             
@@ -143,7 +149,7 @@ class ModelPredictor:
                 st.markdown("#### 이탈 확률")
                 st.markdown('70% 이상의 이탈 확률을 가진 고객은 이탈 위험이 높습니다.')
                 st.plotly_chart(
-                    Visualizer.create_churn_gauge(customer_data['churn_probability']),
+                    Visualizer.create_churn_gauge(customer_data['churn_prob']),
                     use_container_width=True
                 )
 

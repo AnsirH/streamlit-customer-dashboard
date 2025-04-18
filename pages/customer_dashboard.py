@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from utils.visualizer import Visualizer
-from utils.model_predictor import ModelPredictor
+from utils.model_analyzer import ModelPredictor
 # from components.header import show_header
 # from components.animations import add_page_transition
 # from utils.data_generator import generate_sample_data
@@ -119,7 +119,7 @@ def display_churn_analysis(customer_data):
     st.markdown("#### 이탈 확률")
     st.markdown('70% 이상의 이탈 확률을 가진 고객은 이탈 위험이 높습니다.')
     st.plotly_chart(
-        Visualizer.create_churn_gauge(customer_data['churn_probability']),
+        Visualizer.create_churn_gauge(customer_data['churn_prob']),
         use_container_width=True
     )
 
