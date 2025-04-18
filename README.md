@@ -97,6 +97,46 @@
 
 
 ## 📁 파일 구조
+```
+streamlit-customer-dashboard/
+│
+├── app.py                     # 메인 애플리케이션 진입점
+├── config.py                  # 전역 설정 파일
+├── requirements.txt           # 의존성 라이브러리
+│
+├── components/                # UI 컴포넌트
+│   ├── __pycache__/
+│   ├── animations.py          # 페이지 전환 애니메이션
+│   └── header.py              # 헤더 컴포넌트
+│
+├── data/                      # 데이터 저장 디렉토리
+│   ├── raw/                   # 원본 데이터
+│   └── processed/             # 전처리된 데이터
+│
+├── logs/                      # 로그 파일 디렉토리
+│
+├── models/                    # 머신러닝 모델
+│   ├── __pycache__/
+│   ├── churn_model.py         # 이탈 예측 모델 클래스
+│   └── xgboost_best_model.pkl     # 훈련된 XGBoost 모델
+│
+├── pages/                     # 대시보드 페이지
+│   ├── __pycache__/
+│   ├── all_data.py            # 전체 데이터 페이지 (78줄)
+│   ├── customer_analysis.py   # 고객 분석 페이지 (109줄)
+│   ├── customer_dashboard.py  # 고객 대시보드 페이지 (256줄)
+│   ├── prediction.py          # 현재 사용중인 예측 페이지 (705줄)
+│   ├── prediction1.py         # 예측 페이지 버전 1 (100줄)
+│   └── prediction2.py         # 예측 페이지 버전 2 (1098줄)
+│
+└── utils/                     # 유틸리티 함수
+    ├── __pycache__/
+    ├── cache.py               # 캐싱 기능 (35줄)
+    ├── data_generator.py      # 샘플 데이터 생성 (63줄)
+    ├── data_processor.py      # 데이터 전처리 (29줄)
+    ├── logger.py              # 로깅 설정 (27줄)
+    ├── model_predictor.py     # 모델 예측 기능 (233줄)
+    └── visualizer.py          # 데이터 시각화 도구 (408줄)
 
 
 ## 📊 데이터셋 소개
