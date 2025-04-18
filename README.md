@@ -247,9 +247,37 @@ streamlit-customer-dashboard/
 
 ## 🧠 모델링
     ```
-    - 사용 모델: XGBoostClassifier (최종 선택)
-    - 비교 모델: LogisticRegression, KNN, SVC, NaiveBayes
+    - 12개 모델 테스트 후 모델 선택   
+    - 사용 모델:  
+                🔹 선형/기초 모델
+                Logistic Regression
+                
+                K-Nearest Neighbors (KNN)
+                
+                Support Vector Classifier (SVC)
+                
+                Gaussian Naive Bayes (GaussianNB)
+                
+                🔹 트리 기반 모델
+                Decision Tree
+                
+                Random Forest
+                
+                Extra Trees
+                
+                🔹 앙상블 모델
+                Gradient Boosting
+                
+                AdaBoost
+                
+                Bagging
+                
+                XGBoost
+                
+                LightGBM
+    - 최종 모델: XGBoostClassifier (최종 선택)
     - 교차검증: 5-Fold
+    - 비교 모델: LogisticRegression, KNN, SVC, NaiveBayes
     - 하이퍼파라미터 튜닝: GridSearchCV
     ```
 
