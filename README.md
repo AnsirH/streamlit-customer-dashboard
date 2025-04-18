@@ -36,13 +36,13 @@ venv\Scripts\activate     # Windows
 
     
     
-  2-1. 일괄 설치
+          2-1. 일괄 설치
     
 ```bash
 pip install -r requirements.txt
 ```
     
-  2-2. 개별설치
+          2-2. 개별설치
     
 ```bash
 # 기본 환경
