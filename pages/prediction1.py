@@ -148,16 +148,35 @@ if st.button("🧠 이탈 예측하기"):
 
         # 피처 이름 맵
         feature_name_map = {
-            f"feature_{i+1}": name for i, name in enumerate([
-                "이용 기간", "거주 도시 등급", "창고-집 거리", "앱 사용 시간", "등록된 기기 수",
-                "만족도 점수", "배송지 등록 수", "불만 제기 여부", "주문금액 상승률", "쿠폰 사용 횟수",
-                "주문 횟수", "마지막 주문 후 경과일", "캐시백 금액", "선호 로그인 기기", "선호 로그인 기기",
-                "선호 결제 방식", "선호 결제 방식", "선호 결제 방식", "선호 결제 방식", "선호 결제 방식",
-                "선호 결제 방식", "성별", "선호 주문 카테고리", "선호 주문 카테고리", "선호 주문 카테고리",
-                "선호 주문 카테고리", "결혼 여부", "결혼 여부"
-            ])
+            'Tenure': '이용 기간',
+            'CityTier': '거주 도시 등급',
+            'WarehouseToHome': '창고-집 거리',
+            'HourSpendOnApp': '앱 사용 시간',
+            'NumberOfDeviceRegistered': '등록된 기기 수',
+            'SatisfactionScore': '만족도 점수',
+            'NumberOfAddress': '배송지 등록 수',
+            'Complain': '불만 제기 여부',
+            'OrderAmountHikeFromlastYear': '주문금액 상승률',
+            'CouponUsed': '쿠폰 사용 횟수',
+            'OrderCount': '주문 횟수',
+            'DaySinceLastOrder': '마지막 주문 후 경과일',
+            'CashbackAmount': '캐시백 금액',
+            'PreferredLoginDevice_Mobile Phone': '선호 로그인 기기 1',
+            'PreferredLoginDevice_Phone': '선호 로그인 기기 2',
+            'PreferredPaymentMode_COD': '선호 결제 방식 1',
+            'PreferredPaymentMode_Cash on Delivery': '선호 결제 방식 2',
+            'PreferredPaymentMode_Credit Card': '선호 결제 방식 3',
+            'PreferredPaymentMode_Debit Card': '선호 결제 방식 4',
+            'PreferredPaymentMode_E wallet': '선호 결제 방식 5',
+            'PreferredPaymentMode_UPI': '선호 결제 방식 6',
+            'Gender_Male': '성별',
+            'PreferedOrderCat_Grocery': '선호 주문 카테고리 1',
+            'PreferedOrderCat_Laptop & Accessory': '선호 주문 카테고리 2',
+            'PreferedOrderCat_Mobile': '선호 주문 카테고리 3',
+            'PreferedOrderCat_Mobile Phone': '선호 주문 카테고리 4',
+            'MaritalStatus_Married': '결혼 여부 1',
+            'MaritalStatus_Single': '결혼 여부 2'
         }
-
         # 중요도 가져오기
         importance_raw = predictor.get_feature_importance()
 
@@ -178,14 +197,15 @@ if st.button("🧠 이탈 예측하기"):
             elif value >= 0.02: return "낮음"
             else: return "매우 낮음"
 
-        debug_info = [
-            {"원본 이름": k, "한글 이름": feature_name_map.get(k, "❌ 매핑 안됨")}
-            for k in importance_raw
-        ]
+        # 매핑 디버그용
+        # debug_info = [
+        #     {"원본 이름": k, "한글 이름": feature_name_map.get(k, "❌ 매핑 안됨")}
+        #     for k in importance_raw
+        # ]
 
-        st.subheader("🧩 입력 변수 이름 매핑 확인 (디버그)")
-        st.table(debug_info)  # 또는 st.dataframe(debug_info)
-
+        # st.subheader("🧩 입력 변수 이름 매핑 확인 (디버그)")
+        # st.table(debug_info)  # 또는 st.dataframe(debug_info)
+        
 
 
         # ✅ 상위 5개 시각화
