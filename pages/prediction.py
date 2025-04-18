@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-# 모듈 import도 먼저 하기
+# 모듈 import 
 from models.churn_model import load_xgboost_model2, ChurnPredictor2
 
 def show():
@@ -185,84 +185,71 @@ def show():
             # 중요도가 딕셔너리가 아닌 경우, None 또는 튜플 형태일 수 있으므로 처리
             if importance_raw is None:
                 st.error("특성 중요도를 계산할 수 없습니다.")
-                return
                 
             # 중요도가 튜플인 경우 (get_feature_importance가 수정된 경우)
-            if isinstance(importance_raw, tuple):
+            elif isinstance(importance_raw, tuple):
                 features, importances = importance_raw
                 importance_raw = dict(zip(features, importances))
     
-            # 한글 이름 적용
-            importance_named = {
-                feature_name_map.get(k, k): v for k, v in importance_raw.items()
-            }
+                # 한글 이름 적용
+                importance_named = {
+                    feature_name_map.get(k, k): v for k, v in importance_raw.items()
+                }
     
-            # 정리
-            fi_df_all = pd.DataFrame(importance_named.items(), columns=["Feature", "Importance"]) \
-                        .groupby("Feature").sum().sort_values("Importance", ascending=False).reset_index()
+                # 정리
+                fi_df_all = pd.DataFrame(importance_named.items(), columns=["Feature", "Importance"]) \
+                            .groupby("Feature").sum().sort_values("Importance", ascending=False).reset_index()
     
-            # 📌 등급 함수
-            def map_importance_level(value):
-                if value >= 0.12: return "매우 높음"
-                elif value >= 0.08: return "높음"
-                elif value >= 0.05: return "중간"
-                elif value >= 0.02: return "낮음"
-                else: return "매우 낮음"
+                # 📌 등급 함수
+                def map_importance_level(value):
+                    if value >= 0.12: return "매우 높음"
+                    elif value >= 0.08: return "높음"
+                    elif value >= 0.05: return "중간"
+                    elif value >= 0.02: return "낮음"
+                    else: return "매우 낮음"
     
-            # 매핑 디버그용
-            # debug_info = [
-            #     {"원본 이름": k, "한글 이름": feature_name_map.get(k, "❌ 매핑 안됨")}
-            #     for k in importance_raw
-            # ]
+                # ✅ 상위 5개 시각화
+                top5 = fi_df_all.head(5)
+                fig_top = go.Figure(go.Bar(
+                    x=top5["Feature"],
+                    y=top5["Importance"],
+                    marker_color='skyblue'
+                ))
+                fig_top.update_layout(
+                    xaxis_title="입력 변수", yaxis_title="중요도",
+                    title="📊 상위 5개 중요 변수 (입력값 기준)", height=400
+                )
+                st.plotly_chart(fig_top, use_container_width=True)
     
-            # st.subheader("🧩 입력 변수 이름 매핑 확인 (디버그)")
-            # st.table(debug_info)  # 또는 st.dataframe(debug_info)
-            
+                # 해석 출력
+                st.markdown("👍 **높은 연관성성:**")
+                for _, row in top5.iterrows():
+                    level = map_importance_level(row["Importance"])
+                    st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
     
+                # ✅ 하위 5개 시각화
+                bottom5 = fi_df_all.tail(5)
+                fig_bottom = go.Figure(go.Bar(
+                    x=bottom5["Feature"],
+                    y=bottom5["Importance"],
+                    marker_color='lightgrey'
+                ))
+                fig_bottom.update_layout(
+                    xaxis_title="입력 변수", yaxis_title="중요도",
+                    title="📉 미관여 하위 5개 변수", height=400
+                )
+                st.plotly_chart(fig_bottom, use_container_width=True)
     
-            # ✅ 상위 5개 시각화
-            top5 = fi_df_all.head(5)
-            fig_top = go.Figure(go.Bar(
-                x=top5["Feature"],
-                y=top5["Importance"],
-                marker_color='skyblue'
-            ))
-            fig_top.update_layout(
-                xaxis_title="입력 변수", yaxis_title="중요도",
-                title="📊 상위 5개 중요 변수 (입력값 기준)", height=400
-            )
-            st.plotly_chart(fig_top, use_container_width=True)
-    
-            # 해석 출력
-            st.markdown("👍 **높은 연관성성:**")
-            for _, row in top5.iterrows():
-                level = map_importance_level(row["Importance"])
-                st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
-    
-            # ✅ 하위 5개 시각화
-            bottom5 = fi_df_all.tail(5)
-            fig_bottom = go.Figure(go.Bar(
-                x=bottom5["Feature"],
-                y=bottom5["Importance"],
-                marker_color='lightgrey'
-            ))
-            fig_bottom.update_layout(
-                xaxis_title="입력 변수", yaxis_title="중요도",
-                title="📉 미관여 하위 5개 변수", height=400
-            )
-            st.plotly_chart(fig_bottom, use_container_width=True)
-    
-            # 해석 출력
-            st.markdown("👎 **낮은 연관성성**")
-            for _, row in bottom5.iterrows():
-                level = map_importance_level(row["Importance"])
-                st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
+                # 해석 출력
+                st.markdown("👎 **낮은 연관성성**")
+                for _, row in bottom5.iterrows():
+                    level = map_importance_level(row["Importance"])
+                    st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
         except Exception as e:
             st.error(f"❌ 예측 실패: {str(e)}")
             import traceback
             st.write(traceback.format_exc())
 
-# 직접 실행될 때만 동작하도록 메인 함수 추가
+# 직접 실행될 때만 사용
 if __name__ == "__main__":
-    # 직접 실행 시에도 페이지 설정 호출 제거
-    show()
+    pass  # 직접 실행에 필요한 코드가 있으면 여기에 추가
