@@ -4,37 +4,38 @@ import plotly.graph_objects as go
 from pathlib import Path
 import sys
 import datetime
+import traceback
 
 # 경로 설정
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from models.churn_model import load_xgboost_model2, ChurnPredictor2
-
+# 디버깅 로그 함수
 def debug_log(message):
     """디버깅용 로그 기록 함수"""
     with open(f"{ROOT}/debug_log.txt", "a") as f:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"[{timestamp}] {message}\n")
+        f.write(f"[{timestamp}] [prediction.py] {message}\n")
+
+try:
+    debug_log("모듈 임포트 시작")
+    from models.churn_model import load_xgboost_model2, ChurnPredictor2
+    debug_log("모듈 임포트 완료")
+except Exception as e:
+    debug_log(f"모듈 임포트 오류: {str(e)}")
+    debug_log(traceback.format_exc())
 
 def show():
     """고객 이탈 예측 페이지를 표시합니다."""
     debug_log("prediction.py의 show() 함수 호출됨")
     
     try:
-        # st.set_page_config 사용 시 오류 발생 가능성 추적
-        debug_log("st.set_page_config 호출 시도 전")
         # st.set_page_config(page_title="고객 이탈 예측", layout="wide")
-        debug_log("st.set_page_config 호출 후 (주석처리됨)")
+        # 주의: app.py에서 이미 st.set_page_config가 호출되었으므로 여기서는 제거함
         
         st.title("📊 고객 이탈 예측 시스템")
         debug_log("페이지 타이틀 설정 완료")
-    
-        # --------------------------
-        # 1️⃣ UI 입력 섹션 (총 18개)
-        # --------------------------
-        st.subheader("1️⃣ 고객 데이터 입력")
         
         # 디버깅 정보 표시
         with st.expander("🔍 디버깅 정보"):
@@ -42,6 +43,11 @@ def show():
             st.write(f"ROOT 경로: {ROOT}")
             st.write(f"sys.path: {sys.path}")
             st.write(f"현재 시간: {datetime.datetime.now()}")
+        
+        # --------------------------
+        # 1️⃣ UI 입력 섹션 (총 18개)
+        # --------------------------
+        st.subheader("1️⃣ 고객 데이터 입력")
         
         row1 = st.columns(3)
         row2 = st.columns(3)
@@ -51,41 +57,44 @@ def show():
         row6 = st.columns(3)
         
         # 1~3
-        tenure         = row1[0].number_input("\uc774\uc6a9 \uae30\uac04 (\uac1c\uc6d4)", min_value=0, value=12)
-        city_tier      = row1[1].selectbox("\uac70\uc8fc \ub3c4\uc2dc \ub4f1\uae09 (1~3)", [1, 2, 3], index=1)
-        warehouse_dist = row1[2].number_input("\ucc3d\uace0-\uc9d1 \uac70\ub9ac (km)", min_value=0.0, value=20.0)
+        tenure         = row1[0].number_input("이용 기간 (개월)", min_value=0, value=12)
+        city_tier      = row1[1].selectbox("거주 도시 등급 (1~3)", [1, 2, 3], index=1)
+        warehouse_dist = row1[2].number_input("창고-집 거리 (km)", min_value=0.0, value=20.0)
         
         # 4~6
-        app_hour    = row2[0].number_input("\uc571 \uc0ac\uc6a9 \uc2dc\uac04 (\uc2dc\uac04)", min_value=0.0, value=2.5)
-        num_devices = row2[1].number_input("\ub4f1\ub85d\ub41c \uae30\uae30 \uc218", min_value=0, value=2)
-        satisfaction= row2[2].slider("\ub9cc\uc871\ub3c4 \uc810\uc218 (1~5)", 1, 5, 3)
+        app_hour    = row2[0].number_input("앱 사용 시간 (시간)", min_value=0.0, value=2.5)
+        num_devices = row2[1].number_input("등록된 기기 수", min_value=0, value=2)
+        satisfaction= row2[2].slider("만족도 점수 (1~5)", 1, 5, 3)
         
         # 7~9
-        num_address = row3[0].number_input("\ubc30\uc1a1\uc9c0 \ub4f1\ub85d \uc218", min_value=0, value=1)
-        complain    = row3[1].selectbox("\ubd88\ub9cc \uc81c\uae30 \uc720\ubb34", ["\uc608", "\uc544\ub2c8\uc624"])
-        order_hike  = row3[2].number_input("\uc8fc\ubb38\uae08\uc561 \uc0c1\uc2b9\ub960 (%)", value=10.0)
+        num_address = row3[0].number_input("배송지 등록 수", min_value=0, value=1)
+        complain    = row3[1].selectbox("불만 제기 유무", ["예", "아니오"])
+        order_hike  = row3[2].number_input("주문금액 상승률 (%)", value=10.0)
         
         # 10~12
-        coupon_used = row4[0].number_input("\ucfe0\ud3f0 \uc0ac\uc6a9 \ud69f\uc218", value=2)
-        orders      = row4[1].number_input("\uc8fc\ubb38 \ud69f\uc218", value=8)
-        last_order_days = row4[2].number_input("\ub9c8\uc9c0\ub9c9 \uc8fc\ubb38 \ud6c4 \uac74\uc640\uc77c", value=10)
+        coupon_used = row4[0].number_input("쿠폰 사용 횟수", value=2)
+        orders      = row4[1].number_input("주문 횟수", value=8)
+        last_order_days = row4[2].number_input("마지막 주문 후 경과일", value=10)
         
         # 13~15
-        cashback     = row5[0].number_input("\uce90\uc2dc\ubca1 \uae08\uc561", value=150)
-        login_device = row5[1].selectbox("\uc120\ud638 \ub85c\uadf8\uc778 \uae30\uae00", ["Mobile Phone", "Phone"])
-        payment_mode = row5[2].selectbox("\uc120\ud638 \uacb0\uc81c \ubc29\uc2dd", [
+        cashback     = row5[0].number_input("캐시백 금액", value=150)
+        login_device = row5[1].selectbox("선호 로그인 기기", ["Mobile Phone", "Phone"])
+        payment_mode = row5[2].selectbox("선호 결제 방식", [
             "Credit Card", "Debit Card", "Cash on Delivery", "COD", "E wallet", "UPI"])
         
         # 16~18
-        gender      = row6[0].selectbox("\uc131\ubcc4", ["Male", "Female"])
-        order_cat   = row6[1].selectbox("\uc120\ud638 \uc8fc\ubb38 \uce74\ud14c\uace0\ub9ac", [
+        gender      = row6[0].selectbox("성별", ["Male", "Female"])
+        order_cat   = row6[1].selectbox("선호 주문 카테고리", [
             "Mobile", "Mobile Phone", "Laptop & Accessory", "Grocery"])
-        marital     = row6[2].selectbox("\uacb0\ud63c \uc720\ubb34", ["Single", "Married"])
+        marital     = row6[2].selectbox("결혼 유무", ["Single", "Married"])
+        
+        debug_log("UI 필드 설정 완료")
         
         # --------------------------
         # 2️⃣ 예측 버튼 누르면 실행
         # --------------------------
         if st.button("🧠 이탈 예측하기"):
+            debug_log("예측 버튼 클릭됨")
         
             # 기본 수치형 + 범주형 코드화 전
             raw_input = {
@@ -108,6 +117,8 @@ def show():
                 "PreferedOrderCat": order_cat,
                 "MaritalStatus": marital
             }
+            
+            debug_log("입력 데이터 준비 완료")
         
             df_input = pd.DataFrame([raw_input])
         
@@ -117,6 +128,7 @@ def show():
                 "PreferedOrderCat", "MaritalStatus"
             ]
             df_encoded = pd.get_dummies(df_input, columns=one_hot_cols)
+            debug_log("원-핫 인코딩 완료")
         
             # ✅ 모델 요구 피처 목록
             required_features = [
@@ -138,14 +150,23 @@ def show():
             for col in required_features:
                 if col not in df_encoded.columns:
                     df_encoded[col] = 0
+                    debug_log(f"누락된 피처 추가: {col}")
         
             # 순서 맞춤
             df_encoded = df_encoded[required_features]
+            debug_log("피처 정렬 완료")
         
             try:
+                debug_log("모델 로딩 시작")
                 model = load_xgboost_model2()
+                debug_log("모델 로딩 완료")
+                
                 predictor = ChurnPredictor2(external_model=model)
+                debug_log("예측기 초기화 완료")
+                
                 y_pred, y_proba = predictor.predict(df_encoded)
+                debug_log(f"예측 완료: class={y_pred[0]}, prob={y_proba[0]}")
+                
                 prob_pct = float(y_proba[0]) * 100
         
                 # 📈 게이지 차트
@@ -166,6 +187,7 @@ def show():
                     }
                 ))
                 st.plotly_chart(fig, use_container_width=True)     
+                debug_log("게이지 차트 표시 완료")
         
                 # 3️⃣ 예측에 영향을 준 주요 요인
                 st.header("3️⃣ 예측에 영향을 준 주요 요인")
@@ -203,6 +225,7 @@ def show():
                 }
                 # 중요도 가져오기
                 importance_raw = predictor.get_feature_importance()
+                debug_log("피처 중요도 계산 완료")
         
                 # 한글 이름 적용
                 importance_named = {
@@ -213,26 +236,7 @@ def show():
                 fi_df_all = pd.DataFrame(importance_named.items(), columns=["Feature", "Importance"]) \
                             .groupby("Feature").sum().sort_values("Importance", ascending=False).reset_index()
         
-                # 📌 등급 함수
-                def map_importance_level(value):
-                    if value >= 0.12: return "매우 높음"
-                    elif value >= 0.08: return "높음"
-                    elif value >= 0.05: return "중간"
-                    elif value >= 0.02: return "낮음"
-                    else: return "매우 낮음"
-        
-                # 매핑 디버그용
-                # debug_info = [
-                #     {"원본 이름": k, "한글 이름": feature_name_map.get(k, "❌ 매핑 안됨")}
-                #     for k in importance_raw
-                # ]
-        
-                # st.subheader("🧩 입력 변수 이름 매핑 확인 (디버그)")
-                # st.table(debug_info)  # 또는 st.dataframe(debug_info)
-                
-        
-        
-                # ✅ 상위 5개 시각화
+                # 중요 피처 상위 5개 시각화
                 top5 = fi_df_all.head(5)
                 fig_top = go.Figure(go.Bar(
                     x=top5["Feature"],
@@ -241,51 +245,38 @@ def show():
                 ))
                 fig_top.update_layout(
                     xaxis_title="입력 변수", yaxis_title="중요도",
-                    title="📊 상위 5개 중요 변수 (입력값 기준)", height=400
+                    title="📊 상위 5개 중요 변수", height=400
                 )
                 st.plotly_chart(fig_top, use_container_width=True)
-        
-                # 해석 출력
-                st.markdown("👍 **높은 연관성성:**")
-                for _, row in top5.iterrows():
-                    level = map_importance_level(row["Importance"])
-                    st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
-        
-                # ✅ 하위 5개 시각화
-                bottom5 = fi_df_all.tail(5)
-                fig_bottom = go.Figure(go.Bar(
-                    x=bottom5["Feature"],
-                    y=bottom5["Importance"],
-                    marker_color='lightgrey'
-                ))
-                fig_bottom.update_layout(
-                    xaxis_title="입력 변수", yaxis_title="중요도",
-                    title="📉 미관여 하위 5개 변수", height=400
-                )
-                st.plotly_chart(fig_bottom, use_container_width=True)
-        
-                # 해석 출력
-                st.markdown("👎 **낮은 연관성성**")
-                for _, row in bottom5.iterrows():
-                    level = map_importance_level(row["Importance"])
-                    st.markdown(f"- `{row['Feature']}` 변수의 영향도는 **{level}** 수준입니다.")
+                debug_log("피처 중요도 차트 표시 완료")
+                
+                # 디버그 정보
+                with st.expander("디버그: 원시 예측값"):
+                    st.write(f"클래스 예측값: {y_pred[0]}")
+                    st.write(f"확률 예측값 (raw): {y_proba[0]:.6f}")
+                    # 매우 낮은 예측값에 대한 경고
+                    if float(y_proba[0]) < 0.01:
+                        st.warning("원시 예측값이 매우 낮음 (< 1%): 모델 재검토 필요")
+                
             except Exception as e:
+                debug_log(f"예측 과정에서 오류 발생: {str(e)}")
+                debug_log(traceback.format_exc())
                 st.error(f"❌ 예측 실패: {str(e)}")
+                st.write("오류 상세 정보:", e)
+                
     except Exception as e:
         debug_log(f"show() 함수 실행 중 오류 발생: {str(e)}")
+        debug_log(traceback.format_exc())
         st.error(f"페이지 로딩 중 오류가 발생했습니다: {str(e)}")
         st.write("오류 상세 정보:", e)
-        
-        # 오류 스택트레이스 기록
-        import traceback
-        debug_log(traceback.format_exc())
 
-# 호출 추적을 위한 래퍼 함수
-def show_prediction():
-    debug_log("show_prediction() 함수가 app.py에서 호출됨")
-    show()
-    debug_log("show_prediction() 함수 실행 완료")
-            
 if __name__ == "__main__":
     debug_log("prediction.py가 직접 실행됨")
-    show()
+    # 이 파일이 직접 실행될 때만 set_page_config 호출
+    try:
+        st.set_page_config(page_title="고객 이탈 예측", layout="wide")
+        debug_log("직접 실행 시 페이지 설정 완료")
+        show()
+    except Exception as e:
+        debug_log(f"직접 실행 시 오류 발생: {str(e)}")
+        debug_log(traceback.format_exc())
