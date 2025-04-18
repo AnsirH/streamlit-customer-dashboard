@@ -297,7 +297,7 @@ def load_customer_data():
     """
     try:
         # 데이터셋 경로 설정
-        data_path = os.path.join('models', 'ecommerce_for_prediction.csv')
+        data_path = os.path.join('models', 'full_scaled_data.csv')
         
         # 파일 존재 여부 확인
         if not os.path.exists(data_path):
@@ -305,7 +305,7 @@ def load_customer_data():
         
         # 데이터셋 로드
         df = pd.read_csv(data_path)
-        
+
         # CustomerID 컬럼 확인 및 생성
         if 'CustomerID' not in df.columns:
             print("CustomerID 컬럼이 없어 순차적인 ID를 생성합니다.")
