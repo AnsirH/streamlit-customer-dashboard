@@ -25,24 +25,24 @@ scikit-learn>=1.3.0   # 의존성 충돌 방지용 권장 추가
 ```
 ## 💾 설치 방법
 
-  1. 가상환경 생성 및 활성화:
+1. 가상환경 생성 및 활성화:
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
 venv\Scripts\activate     # Windows
 ```
 
-  2. 패키지 설치:
+2. 패키지 설치:
 
     
     
-    2-1. 일괄 설치
+  2-1. 일괄 설치
     
 ```bash
 pip install -r requirements.txt
 ```
     
-    2-2. 개별설치
+  2-2. 개별설치
     
 ```bash
 # 기본 환경
@@ -57,7 +57,7 @@ pip install openpyxl>=3.1.2
 pip install xgboost>=2.0.0 lightgbm>=4.1.0 imbalanced-learn>=0.11.0 joblib>=1.3.0 shap>=0.42.0 scikit-learn>=1.3.0 
 ```
 
-  3. 앱 실행:
+3. 앱 실행:
 ```bash
 streamlit run app.py
 ```
