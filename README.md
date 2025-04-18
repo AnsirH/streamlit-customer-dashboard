@@ -96,23 +96,42 @@
     ```
 
 
+## 파일 구조
 
 
-## 🗃️ 데이터 셋
-    ```
-    # 원본 데이터
-    - **목적**: 고객의 이탈 가능성을 사전에 예측하여 유지 전략 수립에 활용
-    - **데이터 출처**: Kaggle 공개 데이터셋
-    - **샘플 수**: 5,630명
-    - **피처 수**: 20개 (ID 포함)
-    - **타깃**: `Churn` (0: 유지, 1: 이탈)
-    
-    # 원핫 인코딩 이후 데이터
-    - **샘플 수**: 5,630명
-    - **피처 수**: 28개 (ID 포함)
-    
-    
-    ```
+## 📊 데이터셋 소개
+
+본 프로젝트는 Kaggle에서 제공된 **E-Commerce 고객 데이터셋**을 기반으로, 고객 이탈 여부를 예측하기 위해 활용하였습니다.
+
+- 총 샘플 수: 5,630명
+- 총 컬럼 수: 20개
+- 타깃 변수: `Churn` (0: 유지, 1: 이탈)
+
+| 컬럼명                        | 설명                                       |
+|-----------------------------|--------------------------------------------|
+| CustomerID                  | 고객 고유 식별자                          |
+| Churn                       | 이탈 여부 (0: 유지, 1: 이탈)               |
+| Tenure                      | 고객 이용 기간 (개월)                      |
+| PreferredLoginDevice        | 선호 로그인 기기 (Phone, Mobile Phone 등)  |
+| CityTier                    | 고객 거주 도시 등급 (1~3)                  |
+| WarehouseToHome             | 창고-집 거리 (단위 미상)                   |
+| PreferredPaymentMode        | 선호 결제 방식                             |
+| Gender                      | 성별                                       |
+| HourSpendOnApp              | 하루 평균 앱 사용 시간                    |
+| NumberOfDeviceRegistered    | 등록된 디바이스 수                         |
+| PreferedOrderCat            | 선호 주문 카테고리                         |
+| SatisfactionScore           | 고객 만족도 (1~5)                          |
+| MaritalStatus               | 결혼 여부 (Single, Married)               |
+| NumberOfAddress             | 등록된 배송지 수                           |
+| Complain                    | 불만 제기 여부 (0 또는 1)                  |
+| OrderAmountHikeFromlastYear | 전년도 대비 주문 금액 상승률              |
+| CouponUsed                  | 쿠폰 사용 여부                             |
+| OrderCount                  | 총 주문 횟수                               |
+| DaySinceLastOrder           | 마지막 주문 이후 경과일                    |
+| CashbackAmount              | 누적 캐시백 금액                           |
+
+> ⚠ 일부 변수(`Tenure`, `WarehouseToHome`, `HourSpendOnApp` 등)는 결측값을 포함하고 있으며, 전처리 과정에서 평균 대체 또는 제거됨.
+
 
 
 
