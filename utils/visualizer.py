@@ -116,58 +116,69 @@ class Visualizer:
     @staticmethod
     def create_churn_gauge(probability):
         """이탈 확률 게이지 차트 (Indicator)"""
-        # Streamlit 테마 정보 가져오기
-        theme = st.get_option("theme.base")
-        is_dark = theme == "dark"
-        
-        # 테마에 따른 색상 설정
-        bg_color = "rgba(0,0,0,0)" if is_dark else "white"
-        text_color = "white" if is_dark else "black"
-        
-        risk_level = "high" if probability > VIZ_CONFIG['thresholds']['medium'] else \
-                    "medium" if probability > VIZ_CONFIG['thresholds']['low'] else "low"
-        
-        # range 함수
-        def get_gauge_color(val):
-            if val <= 30:
-                return "green"
-            elif val <= 50:
-                return "yellow"
-            elif val <= 70:
-                return "orange"
+        try:
+            # probability가 None이거나 숫자가 아닌 경우 0으로 처리
+            if probability is None or not isinstance(probability, (int, float)):
+                probability = 0
+                st.warning("이탈 확률을 계산할 수 없습니다.")
+
+            # 확률값을 0-1 범위로 제한
+            probability = max(0, min(1, float(probability)))
+            
+            # 위험도 수준 결정 (0-100 스케일)
+            prob_percentage = probability * 100
+            
+            # 게이지 색상 결정
+            if prob_percentage >= 70:
+                gauge_color = "#FF4B4B"
+            elif prob_percentage >= 30:
+                gauge_color = "#FFA500"
             else:
-                return "red"
-        
-        # 컬러 함수 적용
-        fig = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=probability * 100,
-            domain={'x': [0, 1], 'y': [0, 1]},
-            # title={'text': "이탈확률"},
-            gauge={
-                'shape' : 'angular',
-                'axis': {'range': [0, 100], 'visible': True, 'tickvals': [0, 30, 50, 70, 100]},
-                'bar': {'color': get_gauge_color(probability * 100)},
-                'bgcolor': 'lightgray',
-                'borderwidth': 2,
-                'bordercolor': 'lightgray',
-                'steps': [],
-                'threshold':{
-                    'line': {'color': "rgba(0,0,0,0)", 'width': 0},
-                    'thickness': 0.75,
-                    'value': probability * 100
+                gauge_color = "#32CD32"
+            
+            # Plotly Figure 객체 생성
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=prob_percentage,
+                domain={'x': [0, 1], 'y': [0, 1]},
+                number={
+                    'suffix': "%",
+                    'font': {'size': 36, 'color': 'white'}  # 확률값 크기를 36으로 증가
+                },
+                gauge={
+                    'shape': "angular",
+                    'axis': {
+                        'range': [0, 100],
+                        'tickwidth': 1,
+                        'tickcolor': "darkblue",
+                        'tickvals': [0, 30, 50, 70, 100],
+                        'ticktext': ["0%", "30%", "50%", "70%", "100%"]
+                    },
+                    'bar': {'color': gauge_color, 'thickness': 0.8},  # 게이지 바 색상을 검정색으로 변경
+                    'bgcolor': "white",
+                    'borderwidth': 2,
+                    'bordercolor': "gray",
+                    'threshold': {
+                        'line': {'color': "black", 'width': 4},
+                        'thickness': 0.75,
+                        'value': prob_percentage
+                    }
                 }
-            }
-        ))
-        fig.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            height=400,  # 높이 설정
-            margin=dict(l=20, r=20, t=20, b=20)  # 여백 최소화
-        )
-        
-        return fig
+            ))
+
+            # 레이아웃 설정
+            fig.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=400,
+                margin=dict(l=30, r=30, t=100, b=30)
+            )
+            
+            return fig
+            
+        except Exception as e:
+            st.error(f"게이지 차트 생성 중 오류 발생: {str(e)}")
+            return go.Figure()  # 빈 Figure 반환
 
     @staticmethod
     def create_bar_chart(data, x, y, title="", orientation='v'):
@@ -245,14 +256,12 @@ class Visualizer:
         return fig
 
     @staticmethod
-    def create_risk_distribution(data, column='churn_probability'):
-        """이탈 위험도 분포 시각화"""
-        fig = px.histogram(data, x=column, nbins=20, title='이탈 위험도 분포')
-        fig.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white')
-        )
+    def create_risk_distribution(data, column='churn_prob'):
+        """이탈 위험 분포를 시각화합니다."""
+        fig = px.histogram(data, x=column, nbins=50,
+                          title='이탈 위험 분포',
+                          labels={column: '이탈 확률', 'count': '고객 수'})
+        fig.update_layout(bargap=0.1)
         return fig
 
     @staticmethod
@@ -344,65 +353,122 @@ class Visualizer:
         return fig 
 
     @staticmethod
-    def create_correlation_bar(data=None, target_column='이탈여부', churn_factors=None):
-        """특성별 상관계수 바 차트 생성"""
-        # 예시 데이터 생성 (실제 데이터가 없는 경우)
-        if data is None:
-            np.random.seed(42)
-            n_samples = 100
-            example_data = {
-                '이탈여부': np.random.randint(0, 2, n_samples),
-                '주문횟수': np.random.randint(1, 100, n_samples),
-                '마지막주문일수': np.random.randint(1, 90, n_samples),
-                '캐쉬백금액': np.random.uniform(0, 100, n_samples),
-                '앱사용시간': np.random.uniform(0, 10, n_samples),
-                '만족도': np.random.randint(1, 6, n_samples),
-                '주문금액증가율': np.random.uniform(-20, 50, n_samples),
-                '거래기간': np.random.randint(1, 60, n_samples)
+    def create_correlation_bar(df, customer_id=None):
+        """선택된 고객의 특성별 이탈 영향도를 막대 그래프로 시각화합니다."""
+        try:
+            # 특성 이름과 한글 매핑
+            features = {
+                'Tenure': '거래 기간',
+                'CityTier': '도시 등급',
+                'WarehouseToHome': '배송 거리',
+                'HourSpendOnApp': '앱 사용 시간',
+                'NumberOfDeviceRegistered': '등록된 기기 수',
+                'SatisfactionScore': '만족도',
+                'NumberOfAddress': '배송지 수',
+                'Complain': '불만 제기',
+                'OrderAmountHikeFromlastYear': '주문 금액 증가율',
+                'CouponUsed': '쿠폰 사용 횟수',
+                'OrderCount': '주문 횟수',
+                'DaySinceLastOrder': '마지막 주문 경과일',
+                'CashbackAmount': '캐시백 금액'
             }
-            data = pd.DataFrame(example_data)
-        
-        # 상관계수 계산
-        correlations = data.corr()[target_column].drop(target_column)
-        correlations = correlations.sort_values(ascending=True)
-        
-        # 색상 매핑
-        colors = ['lightcoral' if x < 0 else 'lightblue' for x in correlations]
-        
-        # 주요 이탈 요인 표시 (예시)
-        if churn_factors is None:
-            churn_factors = {
-                '마지막주문일수': '고객이 마지막으로 주문한 후 경과한 일수',
-                '만족도': '고객 만족도 점수',
-                '앱사용시간': '앱 사용 시간',
-                '주문금액증가율': '전년 대비 주문 금액 증가율'
-            }
-        
-        # 바 차트 생성
-        fig = go.Figure(go.Bar(
-            x=correlations.values,
-            y=correlations.index,
-            orientation='h',
-            marker_color=colors,
-            text=[f"{churn_factors.get(feature, '')}" for feature in correlations.index],
-            textposition='auto',
-            textfont=dict(size=12, color='white')
-        ))
-        
-        fig.update_layout(
-            xaxis_title='상관계수',
-            yaxis_title='특성',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            height=600,
-            margin=dict(l=20, r=20, t=40, b=20),
-            hovermode='y unified',
-            hoverlabel=dict(
-                bgcolor='rgba(0,0,0,0.8)',
-                font_size=12,
-                font_family="Rockwell"
-            )
-        )
-        
-        return fig 
+            
+            # 수치형 컬럼만 선택
+            numeric_cols = list(features.keys())
+            
+            if customer_id is not None and customer_id in df.index:
+                # 선택된 고객의 데이터
+                customer_data = df.loc[customer_id]
+                
+                # 각 특성의 영향도 계산
+                feature_impacts = []
+                feature_names = []
+                
+                for col in numeric_cols:
+                    if col in df.columns:
+                        # 해당 특성의 평균과 표준편차 계산
+                        mean_val = df[col].mean()
+                        std_val = df[col].std()
+                        
+                        if std_val != 0:
+                            # Z-score 계산으로 영향도 산출
+                            z_score = (customer_data[col] - mean_val) / std_val
+                            # 이탈 확률과의 상관관계 방향 고려
+                            corr = df[col].corr(df['churn_prob'])
+                            impact = z_score * corr
+                            
+                            feature_impacts.append(impact)
+                            feature_names.append(features[col])
+                
+                # 데이터프레임 생성
+                impact_df = pd.DataFrame({
+                    'Feature': feature_names,
+                    'Impact': feature_impacts
+                })
+                
+                # 절대값 기준으로 정렬
+                impact_df['abs_impact'] = impact_df['Impact'].abs()
+                impact_df = impact_df.sort_values('abs_impact', ascending=True)
+                
+                # 색상 설정 (빨간색: 이탈 위험 증가, 파란색: 이탈 위험 감소)
+                colors = ['#FF6B6B' if x > 0 else '#4ECDC4' for x in impact_df['Impact']]
+                
+                # 막대 그래프 생성
+                fig = go.Figure()
+                
+                # 양수 값 (이탈 위험 증가)
+                positive_mask = impact_df['Impact'] > 0
+                if positive_mask.any():
+                    fig.add_trace(go.Bar(
+                        y=impact_df[positive_mask]['Feature'],
+                        x=impact_df[positive_mask]['Impact'],
+                        orientation='h',
+                        name='이탈 위험 증가',
+                        marker_color='#FF6B6B',
+                        text=[f'+{x:.2f}' for x in impact_df[positive_mask]['Impact']],
+                        textposition='auto',
+                    ))
+                
+                # 음수 값 (이탈 위험 감소)
+                negative_mask = impact_df['Impact'] <= 0
+                if negative_mask.any():
+                    fig.add_trace(go.Bar(
+                        y=impact_df[negative_mask]['Feature'],
+                        x=impact_df[negative_mask]['Impact'],
+                        orientation='h',
+                        name='이탈 위험 감소',
+                        marker_color='#4ECDC4',
+                        text=[f'{x:.2f}' for x in impact_df[negative_mask]['Impact']],
+                        textposition='auto',
+                    ))
+                
+                # 레이아웃 설정
+                fig.update_layout(
+                    title=f'고객 {customer_id}의 특성별 이탈 영향도',
+                    xaxis_title='이탈 영향도 (음수: 위험 감소, 양수: 위험 증가)',
+                    yaxis_title='특성',
+                    showlegend=True,
+                    legend=dict(
+                        orientation='h',
+                        yanchor='bottom',
+                        y=1.02,
+                        xanchor='right',
+                        x=1
+                    ),
+                    height=500,
+                    xaxis=dict(
+                        gridcolor='rgba(255,255,255,0.1)',
+                        zerolinecolor='rgba(255,255,255,0.2)',
+                    ),
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='white')
+                )
+                
+                return fig
+            
+            return None
+            
+        except Exception as e:
+            st.error(f"이탈 영향도 그래프 생성 중 오류 발생: {str(e)}")
+            return None 

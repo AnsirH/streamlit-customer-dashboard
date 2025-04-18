@@ -13,6 +13,5 @@
 2025-04-17 17:32:44,226 - models.churn_model - ERROR - ¿¹Ãø ¿À·ù: DataFrame.dtypes for data must be int, float, bool or category. When categorical type is supplied, the experimental DMatrix parameter`enable_categorical` must be set to `True`.  Invalid columns:PreferredLoginDevice: object, PreferredPaymentMode: object, Gender: object, PreferedOrderCat: object, MaritalStatus: object
 2025-04-17 17:41:14,686 - models.churn_model - INFO - ¸ğµ¨ ·Îµå ¼º°ø: C:\Users\USER\Desktop\KoBookNLP-main\streamlit-customer-dashboard\models\xgb_best_model.pkl
 2025-04-17 17:41:14,689 - models.churn_model - ERROR - ¿¹Ãø ¿À·ù: DataFrame.dtypes for data must be int, float, bool or category. When categorical type is supplied, the experimental DMatrix parameter`enable_categorical` must be set to `True`.  Invalid columns:PreferredLoginDevice: object, PreferredPaymentMode: object, Gender: object, PreferedOrderCat: object, MaritalStatus: object
-2025-04-18 01:10:19,744 - models.churn_model - ERROR - ¸ğµ¨ ÆÄÀÏÀ» Ã£À» ¼ö ¾ø½À´Ï´Ù: C:\Users\user\Desktop\github\streamlit-customer-dashboard\models\xgb_best_model.pkl
-2025-04-18 03:59:47,729 - models.churn_model - ERROR - ¸ğµ¨ ÆÄÀÏÀ» Ã£À» ¼ö ¾ø½À´Ï´Ù: C:\Users\user\Desktop\github\streamlit-customer-dashboard\models\xgb_best_model.pkl
-2025-04-18 04:17:20,548 - models.churn_model - ERROR - ¸ğµ¨ ÆÄÀÏÀ» Ã£À» ¼ö ¾ø½À´Ï´Ù: C:\Users\user\Desktop\github\streamlit-customer-dashboard\models\xgb_best_model.pkl
+2025-04-17 21:48:27,585 - models.churn_model - ERROR - ëª¨ë¸ íŒŒì¼ì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤: /Users/jmlee/Desktop/skn_ai_project2/team5-git/models/xgb_best_model.pkl
+2025-04-18 00:03:31,815 - models.churn_model - ERROR - ëª¨ë¸ íŒŒì¼ì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤: /Users/jmlee/Desktop/skn_ai_project2/team5-git/models/xgb_best_model.pkl

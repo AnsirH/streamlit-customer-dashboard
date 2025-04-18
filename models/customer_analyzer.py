@@ -5,6 +5,7 @@ import joblib
 from sklearn.preprocessing import LabelEncoder
 import pickle
 import shap
+from utils.customer_analyzer import CustomerAnalyzer
 
 class ChurnPredictor:
     """고객 이탈 예측을 위한 모델 클래스"""
@@ -78,7 +79,7 @@ class ChurnPredictor:
                 
                 # 성공적으로 예측한 경우 특성 중요도 계산
                 try:
-                    self._compute_feature_importance(processed_df)
+                    self._compute_feature_importance(input_df)
                 except Exception as e:
                     # 특성 중요도 계산 실패해도 예측 결과는 반환
                     pass
@@ -167,10 +168,8 @@ def analyze_customers():
         # 데이터셋 로드
         df = pd.read_csv(data_path)
         
-        # CustomerID 컬럼 확인 및 생성
-        if 'CustomerID' not in df.columns:
-            print("CustomerID 컬럼이 없어 순차적인 ID를 생성합니다.")
-            df['CustomerID'] = [f'CUST_{i:06d}' for i in range(1, len(df) + 1)]
+        # CustomerID 생성
+        df = CustomerAnalyzer.generate_customer_ids(df)
         
         # ChurnPredictor 인스턴스 생성
         predictor = ChurnPredictor()
@@ -291,13 +290,13 @@ def analyze_customers():
 
 def load_customer_data():
     """
-    전체 고객 데이터를 로드합니다.
+    전처리된 고객 데이터를 로드합니다.
     Returns:
         DataFrame: 모든 컬럼을 포함한 전체 고객 데이터
     """
     try:
         # 데이터셋 경로 설정
-        data_path = os.path.join('models', 'ecommerce_for_prediction.csv')
+        data_path = os.path.join('models', 'full_scaled_data.csv')
         
         # 파일 존재 여부 확인
         if not os.path.exists(data_path):
@@ -305,6 +304,9 @@ def load_customer_data():
         
         # 데이터셋 로드
         df = pd.read_csv(data_path)
+        
+        # CustomerID 생성
+        df = CustomerAnalyzer.generate_customer_ids(df)
         
         return df
         
