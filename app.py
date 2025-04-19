@@ -45,4 +45,7 @@ elif st.session_state.current_page == 'prediction':
     show()
 elif st.session_state.current_page == 'all_data':
     from pages.all_data import show
+    show()
+elif st.session_state.current_page == 'prediction4':
+    from pages.prediction4 import show
     show() 

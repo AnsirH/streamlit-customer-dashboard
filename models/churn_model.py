@@ -520,7 +520,9 @@ def show_top_influencers(model, X_input):
 import joblib
 from pathlib import Path
 
-def load_xgboost_model2():
+##########################
+# 예측 모델 불러오기 (상세 예외 처리 버전)
+def load_xgboost_model2_safe():
     """
     /models/xgboost_best_model.pkl 파일을 로드합니다.
     
@@ -544,9 +546,6 @@ def load_xgboost_model2():
 ##########################
 # 예측 모델 불러오기 
 #########################
-
-import joblib
-from pathlib import Path
 
 def load_xgboost_model2():
     """xgboost_best_model.pkl 파일을 로드하는 함수"""
