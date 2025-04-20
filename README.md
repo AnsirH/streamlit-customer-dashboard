@@ -11,7 +11,7 @@
 | <img src="images\윤권_이미지.png" width="120"/> | **윤권** | 예측 모델 제작, 예측 탭 제작 |
 | <img src="images\이정민_이미지.png" width="120"/> | **이정민** | 스토리 보드, 고객 분석 탭, 발표 자료 제작 |
 | <img src="images\이준석_이미지.png" width="120"/> | **이준석** | 전체 데이터 분석 탭 제작 및 모델링 과정 분석 |
-| <img src="images\허한결_이미지.png" width="120"/> | **허한결** | 프로젝트 설계 및 고개 분석 탭 제작 |
+| <img src="images\허한결_이미지.png" width="120"/> | **허한결** | 프로젝트 설계 및 고객객 분석 탭 제작 |
 
 
 ## 👨‍💻 프로젝트 필요성
@@ -33,7 +33,7 @@
 ### 팀으로서의 목표
 - 본 프로젝트는 고객 이탈을 예측하기 위한 XGBoost 기반 모델을 구축하고, 전처리, 불균형 보정(SMOTE), 하이퍼파라미터 튜닝(GridSearchCV) 등의 과정을 통해 정확도 높은 이탈 예측 시스템을 완성하는 것을 목표로 합니다.
 
-### 프로그램의 목표
+### 프로젝트의 목표
 - 본 프로젝트의 목표는 E-Commerce 환경에서 **머신러닝 모델(XGBoost)**을 통해 고객의 이탈 가능성을 예측하고, 이를 바탕으로 리텐션 전략 수립 및 마케팅 타겟팅의 효율성 향상에 기여하는 것입니다.
 - 
 
@@ -195,19 +195,19 @@ streamlit-customer-dashboard/
 │
 ├── pages/                     # 대시보드 페이지
 │   ├── __pycache__/
-│   ├── all_data.py            # 전체 데이터 페이지 (78줄)
-│   ├── customer_analysis.py   # 고객 분석 페이지 (109줄)
-│   ├── customer_dashboard.py  # 고객 대시보드 페이지 (256줄)
-│   └── prediction.py          # 현재 사용중인 예측 페이지 (705줄)
+│   ├── all_data.py            # 전체 데이터 페이지
+│   ├── customer_analysis.py   # 고객 분석 페이지
+│   ├── customer_dashboard.py  # 고객 대시보드 페이지
+│   └── prediction.py          # 현재 사용중인 예측 페이지
 │
 └── utils/                     # 유틸리티 함수
     ├── __pycache__/
-    ├── cache.py               # 캐싱 기능 (35줄)
-    ├── data_generator.py      # 샘플 데이터 생성 (63줄)
-    ├── data_processor.py      # 데이터 전처리 (29줄)
-    ├── logger.py              # 로깅 설정 (27줄)
-    ├── model_predictor.py     # 모델 예측 기능 (233줄)
-    └── visualizer.py          # 데이터 시각화 도구 (408줄)
+    ├── cache.py               # 캐싱 기능
+    ├── data_generator.py      # 샘플 데이터 생성
+    ├── data_processor.py      # 데이터 전처리
+    ├── logger.py              # 로깅 설정
+    ├── model_predictor.py     # 모델 예측 기능
+    └── visualizer.py          # 데이터 시각화 도구
 
 ```
 
