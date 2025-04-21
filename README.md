@@ -285,6 +285,18 @@ streamlit-customer-dashboard/
     - 하이퍼파라미터 튜닝: GridSearchCV
     ```
 
+## 🖥️ 화면 설계서 
+![Image](https://github.com/user-attachments/assets/dba3ebbf-1acb-4d24-8fba-0e7c2efa383e)
+![Image](https://github.com/user-attachments/assets/76a58fe7-2aea-4079-bb70-aa3404c26c94)
+![Image](https://github.com/user-attachments/assets/1b6843f1-041e-439f-93d7-a3481948edbc)
+![Image](https://github.com/user-attachments/assets/ba878347-b74b-4797-b198-925c455e017a)
+![Image](https://github.com/user-attachments/assets/b6d25ae4-194b-4ee2-9039-d8ef91e18ee1)
+![Image](https://github.com/user-attachments/assets/a669bf29-85e6-4371-bda8-f079403d30a1)
+![Image](https://github.com/user-attachments/assets/088b4abb-d9b4-4ada-bdb4-ce29d5a018e9)
+![Image](https://github.com/user-attachments/assets/99567790-69f2-4d93-aeea-74f72abb3ccd)
+![Image](https://github.com/user-attachments/assets/0467d689-2d93-4569-968d-e73a53d5f17e)
+![Image](https://github.com/user-attachments/assets/fc47ec37-3419-4fa2-a9c6-d18595fe6a73)
+![Image](https://github.com/user-attachments/assets/d83e8607-c590-4b25-b730-a74aa7ea0deb)
 
 ## ✅ 프로젝트 결과
 
@@ -313,6 +325,14 @@ E-Commerce 비즈니스에서 **효율적인 리텐션 전략 수립과 마케�
 - XGBoost 모델은 **높은 정확도와 재현율**을 기반으로 이탈 고객을 신뢰성 있게 분류함
 
 - **모델의 일반화 성능이 우수(F1 GAP = 0.05)**하여 실제 서비스에 적용 가능성이 높음
+
+## 🤖 발표 PPT(일부)
+![Image](https://github.com/user-attachments/assets/af41a0b5-e95f-404c-8a87-a7d59a2b0f84)
+![Image](https://github.com/user-attachments/assets/a4f6bfc3-3fab-411f-9e04-4b35b29d52fd)
+![Image](https://github.com/user-attachments/assets/f3f1a51c-b3fe-4ce3-afa2-a242b6d30fd8)
+![Image](https://github.com/user-attachments/assets/c822d455-e4b8-489a-8257-2c4f2b3e3236)
+![Image](https://github.com/user-attachments/assets/5bc3e8b0-f49e-4e2e-8ab9-bcd7bd4847cb)
+![Image](https://github.com/user-attachments/assets/fcb79d31-4a39-48eb-af08-34251f3f7c61)
 
 ## 🚀 기대 효과
 
