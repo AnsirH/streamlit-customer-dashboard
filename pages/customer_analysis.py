@@ -269,19 +269,11 @@ def show():
                 "불만 제기 (⚠️ 부정)": "높은 불만 제기"
             }
             
-            # 디버그: 원본 이슈 목록 출력
-            print(f"Debug - Original top_issues: {top_issues}")
-            
             # 매핑 적용
             top_issues = [issue_mapping.get(issue, issue) for issue in top_issues]
             
-            # 디버그: 매핑된 이슈 목록 출력
-            print(f"Debug - Mapped top_issues: {top_issues}")
-            
             # 해석 내용 표시
             for issue in top_issues:
-                print(f"Debug - Looking for interpretation for issue: {issue}")
-                print(f"Debug - Available issues in interpretation_rules: {interpretation_rules['issue'].tolist()}")
                 interpretation_df = interpretation_rules.loc[interpretation_rules['issue'] == issue]
                 if not interpretation_df.empty:
                     interpretation = interpretation_df.iloc[0]['interpretation']
@@ -416,6 +408,7 @@ def show():
             try:
                 return analyzer.predict(pd.DataFrame([row]), debug=False) or 0
             except:
+                print("예측 오류 발생:", row.name)  # 예외 발생 시 고객 ID 출력
                 return 0
                 
         all_customers_data['churn_prob'] = all_customers_data.apply(
@@ -435,20 +428,15 @@ def show():
 def load_interpretation_rules():
     try:
         # CSV 파일을 읽을 때 구분자를 명시적으로 지정하고, 컬럼 이름을 유지
-        df = pd.read_csv('data/interpretation_rules.csv', 
+        df = pd.read_csv('data/formatted_data.csv', 
                         encoding='utf-8', 
                         sep=',', 
-                        quotechar='"',
                         keep_default_na=False)  # NaN 값을 빈 문자열로 처리
         
         # 컬럼 이름이 올바르게 로드되었는지 확인
         if 'issue' not in df.columns or 'interpretation' not in df.columns:
             st.error("해석 규칙 파일의 컬럼 이름이 올바르지 않습니다.")
             return pd.DataFrame(columns=['issue', 'interpretation'])
-        
-        # 컬럼 이름이 올바르게 로드되었는지 확인
-        print(f"Debug - Loaded columns: {df.columns.tolist()}")
-        print(f"Debug - First row: {df.iloc[0].to_dict()}")
         
         return df
     except Exception as e:

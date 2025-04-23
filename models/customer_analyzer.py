@@ -28,21 +28,6 @@ class ChurnPredictor:
                 return False
             
             self.model = joblib.load(self.model_path)
-            print(f"모델 로드 성공: {self.model_path}")
-            
-            # 모델 정보 출력
-            print("\n모델 정보:")
-            print(f"모델 타입: {type(self.model)}")
-            
-            if hasattr(self.model, 'feature_names_'):
-                print("\n모델이 요구하는 feature:")
-                print(self.model.feature_names_)
-            else:
-                print("\n모델의 feature_names_ 속성이 없습니다.")
-            
-            if hasattr(self.model, 'feature_importances_'):
-                print("\n모델의 feature 중요도:")
-                print(self.model.feature_importances_)
             
             return True
         except Exception as e:
