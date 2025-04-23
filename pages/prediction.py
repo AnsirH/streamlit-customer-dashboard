@@ -9,12 +9,14 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
+from components.animations import add_page_transition
 from models.churn_model import load_xgboost_model2, ChurnPredictor2
 
 def show():
     """고객 이탈 예측 페이지를 표시합니다."""
-    # st.set_page_config() 호출 제거 - app.py에서 이미 호출됨
     
+    # 애니메이션 적용
+    add_page_transition()
     try:
         st.title("📊 고객 이탈 예측 시스템")
         
@@ -259,14 +261,4 @@ def show():
                 st.write("오류 상세 정보:", e)
     except Exception as e:
         st.error(f"❌ 페이지 로딩 오류: {str(e)}")
-        st.write("오류 상세 정보:", e)
-
-# 직접 실행될 때만 동작하도록 메인 함수 추가
-if __name__ == "__main__":
-    try:
-        # 직접 실행될 때만 set_page_config 호출
-        st.set_page_config(page_title="고객 이탈 예측", layout="wide")
-        show()
-    except Exception as e:
-        st.error(f"❌ 직접 실행 오류: {str(e)}")
         st.write("오류 상세 정보:", e)

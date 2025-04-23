@@ -1,6 +1,7 @@
 import streamlit as st
 
 def add_page_transition():
+
     st.markdown("""
     <style>
     /* 페이지 전환 애니메이션 */
@@ -18,7 +19,10 @@ def add_page_transition():
         animation: fadeIn 0.5s ease-in-out;
     }
     
-    .stMarkdown, .stDataFrame, .stPlotlyChart {
+    .stMarkdown, .stDataFrame, .stPlotlyChart, h1, h2, h3, 
+                .stColumn > div, .stSelectbox, .stTextInput, 
+                .stButton, .stCheckbox, .stRadio, .stSlider,
+                .stMultiselect, .stFileUploader {
         animation: slideIn 0.5s ease-out;
     }
     

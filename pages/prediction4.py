@@ -6,12 +6,12 @@ from pathlib import Path
 import uuid
 import sys
 
-# 페이지 설정 추가
-st.set_page_config(
-    page_title="고객 이탈 예측 시스템 - 고급 버전",
-    page_icon="🧪",
-    layout="wide"
-)
+# # 페이지 설정 추가
+# st.set_page_config(
+#     page_title="고객 이탈 예측 시스템 - 고급 버전",
+#     page_icon="🧪",
+#     layout="wide"
+# )
 
 # 안전한 변환 함수 선언
 def safe_int(value, minimum=0, fallback=0):
@@ -325,6 +325,6 @@ def show():
         st.error(f"오류가 발생했습니다: {e}")
         st.info("시스템 관리자에게 문의하세요.")
         
-# 이 부분은 직접 스크립트를 실행할 때 사용됩니다
-if __name__ == "__main__":
-    show()
+# # 이 부분은 직접 스크립트를 실행할 때 사용됩니다
+# if __name__ == "__main__":
+#     show()
