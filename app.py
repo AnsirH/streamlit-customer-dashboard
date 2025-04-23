@@ -23,9 +23,9 @@ st.markdown(
 )
 
 pages = [    
-    st.Page("pages\customer_analysis.py"),
-    st.Page("pages\prediction.py"),
-    st.Page(r"pages\all_data.py")
+    st.Page("pages/customer_analysis.py"),
+    st.Page("pages/prediction.py"),
+    st.Page("pages/all_data.py")
 ]
 
 st.navigation(pages, position="hidden")
