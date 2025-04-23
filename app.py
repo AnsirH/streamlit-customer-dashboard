@@ -22,18 +22,13 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# pages = {
-#     "Main": [
-#         st.Page("pages\customer_analysis.py")
-#     ],
-#     "Sub": [
-#         st.Page("pages\prediction.py"),
-#         st.Page(r"pages\all_data.py"),
-#     ],
-# }
+pages = [    
+    st.Page("pages\customer_analysis.py"),
+    st.Page("pages\prediction.py"),
+    st.Page(r"pages\all_data.py")
+]
 
-
-st.navigation(["pages\customer_analysis.py", "pages\prediction.py", r"pages\all_data.py", "pages\prediction4.py"], position="hidden")
+st.navigation(pages, position="hidden")
 
 # 사이드바 설정
 st.sidebar.title("Main")
