@@ -1,4 +1,4 @@
-# Streamlit Customer Dashboard
+# 전자상거래( E-Commerce ) 고객 이탈 예측 프로젝트: PAINT
 
 ## 🧑‍💻 Team 소개
 
@@ -35,8 +35,8 @@
 ### 프로젝트의 목표
 - E-Commerce 환경에서 **머신러닝 모델(XGBoost)**을 통해 고객의 이탈 가능성을 예측하고, 이를 바탕으로 리텐션 전략 수립 및 마케팅 타겟팅의 효율성 향상에 기여합니다.
 
-### 프로젝트 결과물 확인 url
-[text](https://app-customer-dashboardgit-ppskz62qtzpmknrdxdfsps.streamlit.app/)
+### Streamlit url
+https://app-customer-dashboardgit-ppskz62qtzpmknrdxdfsps.streamlit.app/
 
 ## 🛠 Tech Stack
 
